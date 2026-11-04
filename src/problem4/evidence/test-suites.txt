@@ -1,0 +1,190 @@
+# bash scripts/tests/run-all.sh on 1e7b976, 2026-11-04T17:00:27Z
+== test-check-forward
+# test_descendant_passes
+ok - a descendant of the deployed release passes
+# test_ancestor_is_refused
+ok - an ancestor of the deployed release is refused
+# test_ancestor_passes_as_rollback
+ok - a rollback to an ancestor passes
+# test_same_release_passes
+ok - a redeploy of the deployed release passes
+# test_diverged_history_is_refused
+ok - a commit off the deployed line is refused
+# test_unknown_deployed_commit_is_refused
+ok - a deployed commit missing from the checkout is refused
+# test_first_release_passes
+ok - the first release of an environment passes
+# test_dry_run_makes_no_aws_call
+ok - a dry run passes
+ok - a dry run makes no AWS call
+# passed 9, failed 0
+== test-ci-gate
+# test_results
+ok - all jobs succeeded
+ok - a skipped path-filtered job passes
+ok - a failed job fails the gate
+ok - a cancelled job fails the gate
+ok - invalid input is rejected
+# passed 5, failed 0
+== test-deploy-backend
+# test_production_requires_staging_record
+ok - production without a staging record is refused
+ok - no deployment is created without staging evidence
+ok - production with a staging record of the same digest deploys
+# test_production_refuses_a_build_record_of_another_digest
+ok - production refuses an artifact that the build record does not name
+ok - no production deployment is created
+# test_rollback_to_a_release_never_deployed_here_is_refused
+ok - a rollback to a release that this environment never ran is refused
+ok - no deployment is created
+# test_draining_target_does_not_fail_the_check
+ok - a target that is draining after a scale-in does not fail the deploy
+# test_no_healthy_target_fails_the_check
+ok - a fleet with no healthy target fails and returns to the previous release
+# test_deploy_checks_the_whole_fleet
+ok - a healthy deploy exits 0
+ok - the deployment pins the S3 object version
+ok - every deployment target is read
+ok - target group health is read
+ok - a deployment record is written
+# test_wrong_checksum_never_deploys
+ok - a checksum mismatch fails
+ok - no deployment is created
+# test_missing_artifact_never_deploys
+ok - a missing artifact fails
+ok - no deployment is created
+# test_failed_last_instance_rolls_back
+ok - a deployment whose last instance failed exits 3 after the rollback
+ok - the previous release is deployed again
+# test_failed_smoke_after_success_rolls_back
+ok - a release that fails its smoke test exits 3 after the rollback
+# test_vetoed_rollback_stops_and_pages
+ok - a rollback below the live frontend's API needs is vetoed with exit 5
+ok - the vetoed rollback creates no deployment
+# test_release_below_frontend_needs_is_refused
+ok - a release below the live frontend's API needs is refused
+ok - no deployment is created
+# test_rollback_to_retained_release
+ok - a rollback to a retained release exits 0
+# test_rollback_to_missing_release_is_refused
+ok - a rollback to a release that is not retained fails
+# test_dry_run_makes_no_aws_call
+ok - a dry run exits 0
+ok - a dry run makes no AWS call
+# passed 29, failed 0
+== test-deploy-frontend
+# test_production_requires_the_build_record_digest
+ok - production refuses an artifact that the build record does not name
+ok - nothing reaches the production bucket
+# test_production_requires_staging_record
+ok - production without a staging record is refused
+ok - nothing is uploaded without staging evidence
+ok - production with a staging record of the same digest deploys
+ok - a staging record of another digest does not count
+# test_first_deploy_activates_last
+ok - first deploy exits 0
+ok - release aaaaaaa is active
+ok - assets upload before the release index
+ok - release files upload before activation
+ok - invalidation follows activation
+ok - no call uses --delete
+ok - a deployment record is written
+# test_same_release_twice_is_a_no_op
+ok - a repeated deploy of identical bytes exits 0
+# test_same_sha_other_config_is_refused
+ok - a different configuration under the same SHA fails
+ok - the conflicting release is never activated
+# test_upload_failure_stops_before_activation
+ok - a failed upload fails the deploy
+ok - nothing is activated after a failed upload
+# test_wrong_checksum_makes_no_aws_call
+ok - a checksum mismatch fails
+ok - no AWS call happens after a checksum mismatch
+# test_incompatible_backend_blocks_activation
+ok - a backend below min_backend_api blocks the deploy
+ok - nothing is uploaded for an incompatible backend
+# test_failed_smoke_returns_to_previous
+ok - a release that fails its smoke test exits 3
+ok - the previous release is active again
+# test_failed_invalidation_wait_returns_to_previous
+ok - a failed invalidation wait does not report success
+# test_rollback_to_retained_release
+ok - a rollback to a retained release exits 0
+ok - the rollback target is active
+# test_rollback_to_missing_release_is_refused
+ok - a rollback to a release that is not retained fails
+ok - the active release is unchanged
+# test_dry_run_makes_no_aws_call
+ok - a dry run exits 0
+ok - a dry run makes no AWS call
+# passed 31, failed 0
+== test-hooks
+ok - the first deployment succeeds without an existing service
+ok - current points to the first release
+ok - the unit file is installed
+ok - nothing is stopped on the first deployment
+ok - a redeployment succeeds
+ok - current points to the second release
+ok - the redeployment stops the running service first
+ok - the previous release stays on disk
+ok - validation fails when the service reports another release
+ok - the failure names both releases
+ok - only the configured number of releases is kept
+ok - the current release is kept
+ok - the oldest release is removed
+# passed 13, failed 0
+== test-oidc-claims
+# test_unpinned_subject_passes_without_aws
+ok - an unpinned subject only prints the claims while no AWS access follows
+# test_unpinned_subject_fails_before_aws
+ok - an unpinned subject fails when AWS access follows
+# test_matching_subject_passes
+ok - a matching subject passes
+# test_other_subject_fails
+ok - a different subject fails
+# test_other_audience_fails
+ok - a different audience fails
+# test_token_is_never_printed
+ok - the raw token only appears in the masking command
+ok - the masking command precedes any output
+# test_missing_endpoint_fails
+ok - a job without id-token permission fails
+# passed 8, failed 0
+== test-publish-artifact
+# test_first_publish_records_the_object_version
+ok - the first publish exits 0
+ok - the build record names the S3 object version
+# test_rerun_with_the_same_bytes_is_a_no_op
+ok - a re-run of the build for the same commit succeeds
+ok - the first build record stays
+# test_rerun_with_other_bytes_fails
+ok - different bytes under the same commit fail
+# test_dry_run_makes_no_aws_call
+ok - a dry run exits 0
+ok - a dry run makes no AWS call
+# passed 7, failed 0
+== test-summary
+# test_summary_without_webhook
+ok - the summary script exits 0
+ok - the summary names the release
+ok - no notification without a webhook
+# test_failure_notifies_webhook
+ok - a failure posts one notification
+# test_success_does_not_notify
+ok - a success posts no notification
+# passed 5, failed 0
+== test-verify-provenance
+# test_approved_workflow_passes
+ok - an attestation from the approved workflow on main passes
+ok - the signer workflow and ref are pinned on the gh call
+# test_missing_attestation_fails
+ok - an artifact without attestation fails
+# test_unapproved_workflow_fails
+ok - an attestation from an unapproved workflow fails
+# test_branch_build_fails
+ok - an attestation from a branch other than main fails
+# test_self_hosted_build_fails
+ok - an attestation from a self-hosted runner fails
+# passed 6, failed 0
+all suites passed
+exit=0

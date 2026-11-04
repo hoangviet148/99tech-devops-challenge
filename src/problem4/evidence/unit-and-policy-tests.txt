@@ -1,0 +1,12 @@
+# backend: npm test, frontend: npm test, policies: python3 -I infra/policies/test_policies.py, on 1e7b976, 2026-11-04T17:01:48Z
+## backend
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
+## frontend
+ Test Files  3 passed (3)
+      Tests  14 passed (14)
+## policies
+Ran 13 tests in 0.007s
+
+OK

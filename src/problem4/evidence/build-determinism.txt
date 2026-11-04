@@ -1,0 +1,35 @@
+# build determinism on 4c94b7e plus the uncommitted log change of both build scripts, 2026-11-04T17:08:10Z
+17:08:47 built backend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz (b770579ca1ebd3c7faeb8754656480d36212787d823a5a065c6d228e8cee571d)
+17:09:18 built backend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz (b770579ca1ebd3c7faeb8754656480d36212787d823a5a065c6d228e8cee571d)
+17:09:20 built frontend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz (44ae76095ce148e99c4fa86c3ef36cad8d6c0fef26ecf551d828e37a75b4b5cd)
+17:09:21 built frontend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz (44ae76095ce148e99c4fa86c3ef36cad8d6c0fef26ecf551d828e37a75b4b5cd)
+## digests
+b770579ca1ebd3c7faeb8754656480d36212787d823a5a065c6d228e8cee571d  backend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz
+b770579ca1ebd3c7faeb8754656480d36212787d823a5a065c6d228e8cee571d  backend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz
+44ae76095ce148e99c4fa86c3ef36cad8d6c0fef26ecf551d828e37a75b4b5cd  frontend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz
+44ae76095ce148e99c4fa86c3ef36cad8d6c0fef26ecf551d828e37a75b4b5cd  frontend-4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9.tgz
+## backend bundle
+appspec.yml
+deploy/
+deploy/backend.service
+deploy/hooks/
+deploy/hooks/after-install.sh
+deploy/hooks/application-start.sh
+deploy/hooks/application-stop.sh
+deploy/hooks/before-install.sh
+deploy/hooks/lib.sh
+deploy/hooks/validate-service.sh
+dist/
+dist/src/
+dist/src/app.js
+dist/src/index.js
+dist/src/version.js
+package-lock.json
+package.json
+version.json
+## version.json
+{
+  "sha": "4c94b7e93b6b1278b2b3f90101d65f0c3aa203e9",
+  "committed_at": "2026-11-04T17:07:42Z",
+  "api_version": 1
+}

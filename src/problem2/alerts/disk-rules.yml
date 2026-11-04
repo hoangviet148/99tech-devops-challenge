@@ -1,0 +1,55 @@
+groups:
+  - name: load-balancer-disk
+    rules:
+      - alert: DiskSpaceLow
+        expr: |
+          node_filesystem_avail_bytes{fstype=~"ext4|xfs"}
+            / node_filesystem_size_bytes{fstype=~"ext4|xfs"} < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} has under 15 % of its space left for non-root writers"
+          runbook: "src/problem2/SOLUTION.md#runbook"
+
+      - alert: DiskSpaceCritical
+        expr: |
+          node_filesystem_avail_bytes{fstype=~"ext4|xfs"}
+            / node_filesystem_size_bytes{fstype=~"ext4|xfs"} < 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} has under 5 % of its space left for non-root writers"
+          runbook: "src/problem2/SOLUTION.md#runbook"
+
+      - alert: DiskWillFillIn4Hours
+        expr: predict_linear(node_filesystem_avail_bytes{fstype=~"ext4|xfs"}[6h], 4 * 3600) < 0
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} runs out of space for non-root writers within 4 hours at the current rate"
+          runbook: "src/problem2/SOLUTION.md#runbook"
+
+      - alert: InodesLow
+        expr: |
+          node_filesystem_files_free{fstype=~"ext4|xfs"}
+            / node_filesystem_files{fstype=~"ext4|xfs"} < 0.10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} has under 10 % of its inodes left"
+          runbook: "src/problem2/SOLUTION.md#runbook"
+
+      - alert: NginxServerErrorRatioHigh
+        expr: |
+          sum by (instance) (rate(nginx_http_response_count_total{status=~"5.."}[5m]))
+            / sum by (instance) (rate(nginx_http_response_count_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "NGINX on {{ $labels.instance }} answers more than 1 % of requests with a 5xx status"
+          runbook: "src/problem2/SOLUTION.md#runbook"

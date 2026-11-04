@@ -1,0 +1,130 @@
+rule_files:
+  - disk-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: a stable 99 % fill pages on the thresholds, not on the trend, and snap mounts stay quiet
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '68719476736x60'
+      - series: 'node_filesystem_avail_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '687194767x60'
+      - series: 'node_filesystem_size_bytes{instance="lb-1",device="/dev/loop3",mountpoint="/snap/core24/1",fstype="squashfs"}'
+        values: '67108864x60'
+      - series: 'node_filesystem_avail_bytes{instance="lb-1",device="/dev/loop3",mountpoint="/snap/core24/1",fstype="squashfs"}'
+        values: '0x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: DiskSpaceCritical
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              instance: lb-1
+              device: /dev/nvme0n1p1
+              mountpoint: /
+              fstype: ext4
+            exp_annotations:
+              summary: "/ on lb-1 has under 5 % of its space left for non-root writers"
+              runbook: "src/problem2/SOLUTION.md#runbook"
+      - eval_time: 30m
+        alertname: DiskSpaceLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: lb-1
+              device: /dev/nvme0n1p1
+              mountpoint: /
+              fstype: ext4
+            exp_annotations:
+              summary: "/ on lb-1 has under 15 % of its space left for non-root writers"
+              runbook: "src/problem2/SOLUTION.md#runbook"
+      - eval_time: 30m
+        alertname: DiskWillFillIn4Hours
+        exp_alerts: []
+
+  - name: a steady fill from 50 % pages on the trend long before the thresholds
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '68719476736x60'
+      - series: 'node_filesystem_avail_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '34359738368-134217728x60'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: DiskWillFillIn4Hours
+        exp_alerts: []
+      - eval_time: 50m
+        alertname: DiskWillFillIn4Hours
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              instance: lb-1
+              device: /dev/nvme0n1p1
+              mountpoint: /
+              fstype: ext4
+            exp_annotations:
+              summary: "/ on lb-1 runs out of space for non-root writers within 4 hours at the current rate"
+              runbook: "src/problem2/SOLUTION.md#runbook"
+      - eval_time: 50m
+        alertname: DiskSpaceLow
+        exp_alerts: []
+
+  - name: inode exhaustion warns while blocks are free
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_files{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '4194304x60'
+      - series: 'node_filesystem_files_free{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '209715x60'
+      - series: 'node_filesystem_size_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '68719476736x60'
+      - series: 'node_filesystem_avail_bytes{instance="lb-1",device="/dev/nvme0n1p1",mountpoint="/",fstype="ext4"}'
+        values: '34359738368x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: InodesLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: lb-1
+              device: /dev/nvme0n1p1
+              mountpoint: /
+              fstype: ext4
+            exp_annotations:
+              summary: "/ on lb-1 has under 10 % of its inodes left"
+              runbook: "src/problem2/SOLUTION.md#runbook"
+      - eval_time: 30m
+        alertname: DiskSpaceLow
+        exp_alerts: []
+
+  - name: a 2 % 5xx ratio pages
+    interval: 1m
+    input_series:
+      - series: 'nginx_http_response_count_total{instance="lb-1",method="GET",status="200"}'
+        values: '0+5880x30'
+      - series: 'nginx_http_response_count_total{instance="lb-1",method="GET",status="502"}'
+        values: '0+120x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: NginxServerErrorRatioHigh
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              instance: lb-1
+            exp_annotations:
+              summary: "NGINX on lb-1 answers more than 1 % of requests with a 5xx status"
+              runbook: "src/problem2/SOLUTION.md#runbook"
+
+  - name: a 0.5 % 5xx ratio stays quiet
+    interval: 1m
+    input_series:
+      - series: 'nginx_http_response_count_total{instance="lb-1",method="GET",status="200"}'
+        values: '0+5970x30'
+      - series: 'nginx_http_response_count_total{instance="lb-1",method="GET",status="502"}'
+        values: '0+30x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: NginxServerErrorRatioHigh
+        exp_alerts: []

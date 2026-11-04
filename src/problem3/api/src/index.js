@@ -49,11 +49,6 @@ function throttledLog(intervalMs) {
 }
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: "postgres",
-  password: "postgres",
-  database: "postgres",
-  port: 5432,
   max: POOL_MAX,
   connectionTimeoutMillis: 1000,
   idleTimeoutMillis: 30000,
@@ -63,11 +58,6 @@ const pool = new Pool({
 pool.on("error", (err) => log("warn", "idle database client failed", { error: err.message }));
 
 const readinessPool = new Pool({
-  host: process.env.DB_HOST,
-  user: "postgres",
-  password: "postgres",
-  database: "postgres",
-  port: 5432,
   max: 1,
   connectionTimeoutMillis: 300,
   idleTimeoutMillis: 30000,

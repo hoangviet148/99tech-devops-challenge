@@ -1,0 +1,63 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadArtifacts",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectAttributes"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<ARTIFACT_BUCKET>/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ReadRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
+      ]
+    },
+    {
+      "Sid": "WriteOwnRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*"
+      ]
+    },
+    {
+      "Sid": "PublishRelease",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:GetObjectAttributes",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<FRONTEND_BUCKET_STAGING>",
+        "arn:aws:s3:::<FRONTEND_BUCKET_STAGING>/*"
+      ]
+    },
+    {
+      "Sid": "InvalidateOneDistribution",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation"
+      ],
+      "Resource": [
+        "arn:aws:cloudfront::<STAGING_ACCOUNT_ID>:distribution/<DISTRIBUTION_ID_STAGING>"
+      ]
+    }
+  ]
+}

@@ -8,7 +8,10 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 status=0
 
 echo "== actionlint"
-docker run --rm -v "$root:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color=false || status=1
+workflows=()
+for f in "$root"/.github/workflows/*.yml; do workflows+=(".github/workflows/$(basename "$f")"); done
+[ "${#workflows[@]}" -gt 0 ] || { echo "no workflow files under $root/.github/workflows" >&2; exit 1; }
+docker run --rm -v "$root:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color=false "${workflows[@]}" || status=1
 
 echo "== zizmor"
 zizmor_args=(--min-severity medium --no-progress .github)

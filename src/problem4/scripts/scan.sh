@@ -12,7 +12,7 @@ echo "== gitleaks over the git history"
 docker run --rm -v "$repo:/repo:ro" "$GITLEAKS_IMAGE" git /repo --redact --no-banner --exit-code 1 || status=1
 
 echo "== trivy fs"
-docker run --rm -v "$root:/src:ro" -e TRIVY_NO_PROGRESS=true "$TRIVY_IMAGE" fs --scanners vuln,secret,misconfig \
+docker run --rm -v "$root:/src:ro" -e TRIVY_NO_PROGRESS=true "$TRIVY_IMAGE" fs --scanners vuln,secret,misconfig --include-dev-deps \
   --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --skip-dirs node_modules --skip-dirs dist /src || status=1
 
 exit "$status"

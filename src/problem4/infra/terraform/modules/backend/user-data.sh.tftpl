@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+region='${region}'
+artifact_bucket='${artifact_bucket}'
+node_tarball='${node_tarball}'
+node_sha256='${node_sha256}'
+allowed_origins='${allowed_origins}'
+log_group='${log_group}'
+
+dnf install -y rsyslog amazon-cloudwatch-agent
+systemctl enable --now rsyslog
+
+useradd --system --user-group --no-create-home --shell /sbin/nologin backend
+
+aws s3api get-object --region "$region" --bucket "$artifact_bucket" --key "backend/runtime/$node_tarball" "/tmp/$node_tarball" > /dev/null
+printf '%s  %s\n' "$node_sha256" "/tmp/$node_tarball" | sha256sum -c -
+mkdir -p /opt/node
+tar -xJf "/tmp/$node_tarball" -C /opt/node --strip-components=1 --no-same-owner
+rm -f "/tmp/$node_tarball"
+
+install -d -m 0755 /etc/backend
+printf 'ALLOWED_ORIGINS=%s\n' "$allowed_origins" > /etc/backend/backend.env
+
+cwagent_config=/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+cat > "$cwagent_config" <<JSON
+{
+  "agent": {
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {"file_path": "/var/log/messages", "log_group_name": "$log_group", "log_stream_name": "{instance_id}/messages"},
+          {"file_path": "/var/log/cloud-init-output.log", "log_group_name": "$log_group", "log_stream_name": "{instance_id}/cloud-init"},
+          {"file_path": "/var/log/aws/codedeploy-agent/codedeploy-agent.log", "log_group_name": "$log_group", "log_stream_name": "{instance_id}/codedeploy-agent"},
+          {"file_path": "/opt/codedeploy-agent/deployment-root/deployment-logs/codedeploy-agent-deployments.log", "log_group_name": "$log_group", "log_stream_name": "{instance_id}/deployments"}
+        ]
+      }
+    }
+  }
+}
+JSON
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c "file:$cwagent_config"
+
+curl -fsS --retry 5 -o /tmp/codedeploy-install "https://aws-codedeploy-$region.s3.$region.amazonaws.com/latestv2/install"
+AWS_REGION="$region" sh /tmp/codedeploy-install auto
+codedeploy_config=/etc/codedeploy-agent/conf/codedeployagent.yml
+sed -i '/^:enable_auth_policy:/d' "$codedeploy_config"
+printf ':enable_auth_policy: true\n' >> "$codedeploy_config"
+systemctl restart codedeploy-agent

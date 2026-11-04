@@ -6,8 +6,7 @@
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
-        "s3:GetObjectVersion",
-        "s3:GetObjectAttributes"
+        "s3:GetObjectVersion"
       ],
       "Resource": [
         "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
@@ -17,13 +16,30 @@
       "Sid": "ReadRecords",
       "Effect": "Allow",
       "Action": [
-        "s3:GetObject",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/backend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ListRecords",
+      "Effect": "Allow",
+      "Action": [
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::<MANIFEST_BUCKET>",
-        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
-      ]
+        "arn:aws:s3:::<MANIFEST_BUCKET>"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "s3:prefix": [
+            "staging/backend/",
+            "staging/frontend/"
+          ]
+        }
+      }
     },
     {
       "Sid": "WriteOwnRecords",
@@ -61,6 +77,17 @@
       ],
       "Resource": [
         "*"
+      ]
+    },
+    {
+      "Sid": "ReadDeployAlarms",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DescribeAlarms"
+      ],
+      "Resource": [
+        "arn:aws:cloudwatch:<REGION>:<STAGING_ACCOUNT_ID>:alarm:backend-staging-target-5xx-rate",
+        "arn:aws:cloudwatch:<REGION>:<STAGING_ACCOUNT_ID>:alarm:backend-staging-unhealthy-hosts"
       ]
     }
   ]

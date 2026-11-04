@@ -25,11 +25,20 @@
       "Sid": "CheckExistingArtifacts",
       "Effect": "Allow",
       "Action": [
-        "s3:GetObject",
-        "s3:GetObjectAttributes"
+        "s3:GetObject"
       ],
       "Resource": [
         "arn:aws:s3:::<ARTIFACT_BUCKET>/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ReadOwnBuildRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/builds/frontend/*"
       ]
     }
   ]

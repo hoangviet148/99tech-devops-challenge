@@ -57,18 +57,15 @@
         "AWS": [
           "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/backend-staging-deploy",
           "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/backend-production-deploy",
-          "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/frontend-staging-deploy",
-          "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/frontend-production-deploy",
           "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/backend-instance",
           "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/backend-instance"
         ]
       },
       "Action": [
         "s3:GetObject",
-        "s3:GetObjectVersion",
-        "s3:GetObjectAttributes"
+        "s3:GetObjectVersion"
       ],
-      "Resource": "arn:aws:s3:::<ARTIFACT_BUCKET>/*"
+      "Resource": "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
     }
   ]
 }

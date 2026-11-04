@@ -2,27 +2,34 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ReadArtifacts",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:GetObjectAttributes"
-      ],
-      "Resource": [
-        "arn:aws:s3:::<ARTIFACT_BUCKET>/frontend/*"
-      ]
-    },
-    {
       "Sid": "ReadRecords",
       "Effect": "Allow",
       "Action": [
-        "s3:GetObject",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/production/frontend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/builds/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ListRecords",
+      "Effect": "Allow",
+      "Action": [
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::<MANIFEST_BUCKET>",
-        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
-      ]
+        "arn:aws:s3:::<MANIFEST_BUCKET>"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "s3:prefix": [
+            "production/frontend/",
+            "staging/frontend/"
+          ]
+        }
+      }
     },
     {
       "Sid": "WriteOwnRecords",
@@ -40,7 +47,6 @@
       "Action": [
         "s3:PutObject",
         "s3:GetObject",
-        "s3:GetObjectAttributes",
         "s3:ListBucket"
       ],
       "Resource": [

@@ -39,6 +39,9 @@ jobs:
               - '.github/**'
               - 'scripts/**'
               - 'infra/**'
+              - 'backend/.node-version'
+              - 'backend/node-sha256.txt'
+              - 'frontend/config/**'
 
   backend:
     needs: changes
@@ -139,6 +142,7 @@ jobs:
       - run: bash scripts/lint-workflows.sh
         env:
           GH_TOKEN: ${{ github.token }}
+      - run: bash scripts/terraform-check.sh
 
   security:
     runs-on: ubuntu-24.04

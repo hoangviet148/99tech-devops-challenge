@@ -1,0 +1,104 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageLaunchHook",
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:PutLifecycleHook",
+        "autoscaling:DeleteLifecycleHook",
+        "autoscaling:CompleteLifecycleAction",
+        "autoscaling:RecordLifecycleActionHeartbeat"
+      ],
+      "Resource": [
+        "arn:aws:autoscaling:<REGION>:<ACCOUNT_ID>:autoScalingGroup:*:autoScalingGroupName/backend-<ENVIRONMENT>"
+      ]
+    },
+    {
+      "Sid": "ShiftTraffic",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:RegisterTargets",
+        "elasticloadbalancing:DeregisterTargets"
+      ],
+      "Resource": [
+        "arn:aws:elasticloadbalancing:<REGION>:<ACCOUNT_ID>:targetgroup/backend-<ENVIRONMENT>/*"
+      ]
+    },
+    {
+      "Sid": "DescribeFleet",
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:DescribeAutoScalingInstances",
+        "autoscaling:DescribeLifecycleHooks",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetGroupAttributes",
+        "elasticloadbalancing:DescribeTargetHealth",
+        "tag:GetResources"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Sid": "ValidateLaunchTemplate",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "ArnLike": {
+          "ec2:LaunchTemplate": "arn:aws:ec2:<REGION>:<ACCOUNT_ID>:launch-template/*"
+        }
+      }
+    },
+    {
+      "Sid": "TagOnLaunch",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": "RunInstances"
+        }
+      }
+    },
+    {
+      "Sid": "PassInstanceRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::<ACCOUNT_ID>:role/backend-instance"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ResolveImageParameter",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameters"
+      ],
+      "Resource": [
+        "arn:aws:ssm:<REGION>::parameter/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+      ]
+    }
+  ]
+}

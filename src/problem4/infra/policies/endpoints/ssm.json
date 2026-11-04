@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OwnInstancesOnline",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "ssm:UpdateInstanceInformation"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "<ACCOUNT_ID>"
+        }
+      }
+    }
+  ]
+}

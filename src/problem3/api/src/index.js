@@ -1,3 +1,4 @@
+const http = require("http");
 const crypto = require("crypto");
 const express = require("express");
 const { Pool } = require("pg");
@@ -7,6 +8,8 @@ const PORT = Number(process.env.PORT || 3000);
 const POOL_MAX = Number(process.env.PG_POOL_MAX || 4);
 const REQUEST_DEADLINE_MS = 2000;
 const QUERY_MARGIN_MS = 100;
+const DRAIN_MS = 5000;
+const HARD_STOP_MS = 8000;
 const DB_UNAVAILABLE_CODES = new Set([
   "ECONNREFUSED",
   "ECONNRESET",
@@ -58,6 +61,21 @@ const pool = new Pool({
   application_name: "api",
 });
 pool.on("error", (err) => log("warn", "idle database client failed", { error: err.message }));
+
+const readinessPool = new Pool({
+  host: process.env.DB_HOST,
+  user: "postgres",
+  password: "postgres",
+  database: "postgres",
+  port: 5432,
+  max: 1,
+  connectionTimeoutMillis: 300,
+  idleTimeoutMillis: 30000,
+  statement_timeout: 200,
+  query_timeout: 200,
+  application_name: "api-readiness",
+});
+readinessPool.on("error", (err) => log("warn", "idle readiness client failed", { error: err.message }));
 
 const redisLog = throttledLog(10000);
 const redis = new Redis({
@@ -126,6 +144,7 @@ function isUnavailable(err) {
   return DB_UNAVAILABLE_CODES.has(err.code) || /timeout|terminat/i.test(err.message);
 }
 
+let shuttingDown = false;
 const app = express();
 app.disable("x-powered-by");
 
@@ -160,7 +179,38 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+app.get("/healthz", (req, res) => res.json({ status: "ok" }));
 app.get("/status", (req, res) => res.json({ status: "ok" }));
+
+let readinessCheck = null;
+function checkReadiness() {
+  if (!readinessCheck) {
+    readinessCheck = readinessPool
+      .query("SELECT 1")
+      .then(
+        () => true,
+        () => false,
+      )
+      .finally(() => {
+        readinessCheck = null;
+      });
+  }
+  return readinessCheck;
+}
+
+app.get("/readyz", async (req, res) => {
+  const ready = !shuttingDown && (await checkReadiness());
+  res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "not_ready" });
+});
+
+app.get("/internal/pool", (req, res) => {
+  res.json({
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+    redis_write_failures: lastCall.failures,
+  });
+});
 
 app.use((err, req, res, next) => {
   log("error", "unhandled request error", { request_id: req.id, error: err.message });
@@ -168,4 +218,48 @@ app.use((err, req, res, next) => {
   return res.status(500).json({ ok: false, error: "internal_error", request_id: req.id });
 });
 
-app.listen(PORT, () => log("info", "api listening", { port: PORT }));
+const server = http.createServer(app);
+// Must stay above nginx's upstream keepalive_timeout (60 s).
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
+function within(promise, ms) {
+  return Promise.race([
+    Promise.resolve(promise).then(
+      () => true,
+      () => false,
+    ),
+    new Promise((resolve) => {
+      setTimeout(resolve, ms, false).unref();
+    }),
+  ]);
+}
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log("info", "shutdown started", { signal });
+  setTimeout(() => {
+    log("error", "shutdown hard stop", { signal });
+    process.exit(1);
+  }, HARD_STOP_MS).unref();
+  await within(new Promise((resolve) => server.close(resolve)), DRAIN_MS);
+  server.closeAllConnections();
+  await within(Promise.all([pool.end(), readinessPool.end()]), 2000);
+  if (!(await within(redis.quit(), 1000))) redis.disconnect();
+  log("info", "shutdown complete", { signal });
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("uncaughtException", (err) => {
+  log("fatal", "uncaught exception", { error: err.message, stack: err.stack });
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  log("fatal", "unhandled rejection", { error: String(reason) });
+  process.exit(1);
+});
+
+server.listen(PORT, () => log("info", "api listening", { port: PORT }));

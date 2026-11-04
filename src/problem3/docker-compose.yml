@@ -8,21 +8,45 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
   api:
     build: ./api
+    init: true
     environment:
       - DB_HOST=postgres
       - REDIS_HOST=redis
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/readyz"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
   postgres:
     image: postgres:15
     environment:
       POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   redis:
     image: redis:7
+    restart: unless-stopped

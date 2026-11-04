@@ -14,7 +14,8 @@ deploy() {
     bash "$HOOKS/$hook.sh" > /dev/null || return 1
   done
   cp -R /bundle/. /opt/backend/incoming/
-  printf '{\n  "sha": "%s",\n  "committed_at": "2026-11-04T00:00:00Z",\n  "api_version": 1\n}\n' "$sha" > /opt/backend/incoming/version.json
+  printf '{\n  "sha": "%s",\n  "committed_at": "2026-11-04T00:00:00Z",\n  "api_version": 1,\n  "node_version": "24.22.2"\n}\n' "$sha" \
+    > /opt/backend/incoming/version.json
   for hook in after-install application-start validate-service; do
     bash "$HOOKS/$hook.sh" > "/tmp/$hook.log" 2>&1 || { rc=1; break; }
   done
@@ -22,6 +23,13 @@ deploy() {
 }
 
 calls() { grep -c "$1" /run/fake-systemd/calls.log 2> /dev/null || true; }
+
+mkdir -p /opt/node/bin
+cat > /opt/node/bin/node <<'EOF'
+#!/usr/bin/env bash
+echo "v${FAKE_NODE_VERSION:-24.22.2}"
+EOF
+chmod 0755 /opt/node/bin/node
 
 deploy aaaaaaa
 check "the first deployment succeeds without an existing service" 0 $?
@@ -41,6 +49,15 @@ deploy ddddddd
 check "validation fails when the service reports another release" 1 $?
 check "the failure names both releases" 1 "$(grep -c 'serving ccccccc, expected ddddddd' /tmp/validate-service.log)"
 rm -f /run/fake-systemd/serve-sha
+
+export FAKE_NODE_VERSION=24.21.0
+deploy eeeeeee
+check "validation fails on a runtime older than the release was built with" 1 $?
+check "the failure names both runtime versions" 1 "$(grep -c 'runtime 24.21.0 is older than 24.22.2' /tmp/validate-service.log)"
+export FAKE_NODE_VERSION=24.23.0
+deploy fffffff
+check "a newer runtime runs the release" 0 $?
+unset FAKE_NODE_VERSION
 
 for sha in 1111111 2222222 3333333 4444444 5555555 6666666; do
   sleep 1

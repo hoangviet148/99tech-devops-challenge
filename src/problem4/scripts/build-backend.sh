@@ -75,7 +75,8 @@ cp "$app/package.json" "$app/package-lock.json" "$bundle/"
 cp -R "$app/deploy/hooks" "$bundle/deploy/hooks"
 cp "$app/deploy/backend.service" "$bundle/deploy/backend.service"
 committed_at="$(python3 -I -c 'import datetime, sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1]), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$epoch")"
-jq -n --arg sha "$sha" --arg at "$committed_at" --argjson api "$api_version" '{sha: $sha, committed_at: $at, api_version: $api}' > "$bundle/version.json"
+jq -n --arg sha "$sha" --arg at "$committed_at" --argjson api "$api_version" --arg node "$node_version" \
+  '{sha: $sha, committed_at: $at, api_version: $api, node_version: $node}' > "$bundle/version.json"
 
 artifact="$out/backend-$sha.tgz"
 python3 -I "$root/scripts/pack-tgz.py" "$bundle" "$artifact" "$epoch"

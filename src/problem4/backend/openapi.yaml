@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Backend API
+  version: 1.0.0
+  x-api-version: 1
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: The process is serving
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+  /version:
+    get:
+      operationId: getVersion
+      responses:
+        "200":
+          description: The deployed release and the API contract version
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sha, committed_at, api_version]
+                properties:
+                  sha:
+                    type: string
+                  committed_at:
+                    type: [string, "null"]
+                  api_version:
+                    type: integer
+                    minimum: 1
+  /api/v1/greeting:
+    get:
+      operationId: getGreeting
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[\\p{L}\\p{N} ._-]{1,64}$"
+      responses:
+        "200":
+          description: A greeting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, served_at]
+                properties:
+                  message:
+                    type: string
+                  served_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: The name does not match the allowed pattern
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string

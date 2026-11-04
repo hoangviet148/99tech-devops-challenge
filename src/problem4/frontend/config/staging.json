@@ -1,0 +1,5 @@
+{
+  "environment": "staging",
+  "apiBaseUrl": "https://api.staging.example.com",
+  "versionCheckSeconds": 600
+}

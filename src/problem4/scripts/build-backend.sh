@@ -86,4 +86,4 @@ jq -n --arg app backend --arg sha "$sha" --arg digest "$digest" --argjson api "$
   --arg image "$BUILD_IMAGE" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg workflow "${GITHUB_WORKFLOW_REF:-local}" --arg run "${GITHUB_RUN_ID:-local}" \
   '{app: $app, sha: $sha, digest: $digest, api_version: $api, node_version: $node, build_image: $image, built_at: $at, workflow_ref: $workflow, run_id: $run}' \
   > "$out/backend-$sha.build.json"
-log "built $artifact ($digest)"
+log "built $(basename "$artifact") ($digest)"

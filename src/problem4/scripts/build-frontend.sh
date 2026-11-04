@@ -49,4 +49,4 @@ printf '%s  %s\n' "$digest" "$(basename "$artifact")" > "$artifact.sha256"
 jq -n --arg app frontend --arg sha "$sha" --arg digest "$digest" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg workflow "${GITHUB_WORKFLOW_REF:-local}" --arg run "${GITHUB_RUN_ID:-local}" \
   '{app: $app, sha: $sha, digest: $digest, built_at: $at, workflow_ref: $workflow, run_id: $run}' > "$out/frontend-$sha.build.json"
-log "built $artifact ($digest)"
+log "built $(basename "$artifact") ($digest)"

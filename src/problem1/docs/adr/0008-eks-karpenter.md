@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Status | accepted |
-| Date | 2026-11-04 |
+| Date | 2026-11-05 |
 | Deciders | Submission author |
-| Requirements | REQ-P1-3, REQ-P1-4 |
-| Principles | REL-DP3, REL-DP4, GEN-DP1, SUS-DP3 |
+| Requirements | REQ-P1-3, REQ-P1-4, REQ-P1-16A |
+| Principles | REL-DP3, REL-DP4, GEN-DP1, SUS-DP3, COST-DP2 |
 | Supersedes | none |
 
 ## Context
@@ -15,7 +15,7 @@ The matching engines and risk writers need dedicated, pinned cores to keep laten
 
 ## Decision
 
-EKS runs over 3 AZs with Karpenter provisioning Graviton nodes for the stateless pools, Spot capacity only outside the trading path, and a dedicated compute-optimized pool with static CPU pinning for matching and risk. Every service has topology spread constraints and a disruption budget.
+EKS runs over 3 AZs with Karpenter provisioning Graviton nodes for the stateless pools, Spot capacity only outside the trading path, and a dedicated compute-optimized pool with static CPU pinning for matching and risk. That pool runs on-demand nodes only, its pods carry `karpenter.sh/do-not-disrupt`, its NodePool sets `expireAfter: Never` and a disruption budget of zero nodes outside a weekly window, a lower-weight NodePool offers `c7g.2xlarge` as the fallback for capacity errors, and a pinned pod pending for more than 2 min pages. Every service has topology spread constraints and a disruption budget.
 
 ## Alternatives considered
 
@@ -33,21 +33,24 @@ EKS works against OPS-DP8: more to operate than ECS on Fargate, including cluste
 
 ### Positive
 
-- One platform hosts pinned engines and elastic stateless services, with Karpenter adding nodes for bursts (REL-DP4).
+- One platform hosts pinned engines and elastic stateless services, with Karpenter adding nodes for bursts and removing them afterwards (REL-DP4, COST-DP2).
 - Argo CD, Kyverno and KEDA run once for every team.
+- Consolidation and expiry never move a leader or a standby, so the pinned pool fails over only on a fault or in the weekly window.
 
 ### Negative
 
 - EKS version upgrades become a recurring platform task.
+- Outside the weekly window a pinned node changes only on a fault, through node auto repair or an EC2 interruption event, so planned node changes wait for the window.
 
 ### Risks
 
 - A cluster-wide failure affects every service. GitOps rebuilds the cluster from Git, and the platform team runs the upgrade in a non-production cluster first.
+- Node auto repair ignores `karpenter.sh/do-not-disrupt`, so a repaired pinned node is a real failover. Every leader has a hot standby in another AZ for that case.
 
 ## Verification
 
-The cost comparison column of section 8.3 in `SOLUTION.md` (review).
+The pinned against unpinned run in the matching part of the section 7.4 benchmark of `SOLUTION.md` (cloud run), and the cost comparison column of section 8.3 (review).
 
 ## Reopen when
 
-The AD-P1-20 benchmark shows that CPU pinning is not needed, or the cluster causes more than 2 pages per week over a quarter.
+The matching part of the section 7.4 benchmark shows that pinning does not change t1 to t2 p99, or the cluster causes more than 2 pages per week over a quarter.

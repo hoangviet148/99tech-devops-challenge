@@ -5,7 +5,7 @@
 | Status | accepted |
 | Date | 2026-11-04 |
 | Deciders | Submission author |
-| Requirements | REQ-P1-1, REQ-P1-5 |
+| Requirements | REQ-P1-1 |
 | Principles | GEN-DP4, OPS-DP1 |
 | Supersedes | none |
 
@@ -27,7 +27,7 @@ The scope is signup and login with MFA, spot trading on a small set of pairs wit
 
 ## Trade-offs
 
-The cut works against breadth of REQ-P1-1 to keep depth on REQ-P1-14A. KYC behind an interface defers the compliance controls that FSI-DP3 asks to design in, and Problem 5 makes AML onboarding a launch gate (SC-14) to close that gap.
+The cut works against breadth of REQ-P1-1 to keep depth on REQ-P1-14A. KYC behind an interface defers the compliance controls that FSI-DP3 asks to design in, and Problem 5 SC-14 makes AML onboarding a launch gate to close that gap.
 
 ## Consequences
 
@@ -46,8 +46,8 @@ The cut works against breadth of REQ-P1-1 to keep depth on REQ-P1-14A. KYC behin
 
 ## Verification
 
-Review: each in-scope feature maps to section 3.3, section 4 or section 6 of `SOLUTION.md`, and each excluded feature appears in section 14 with its reason (review).
+Review: each in-scope feature maps to section 3.3, section 4 or section 6 of `SOLUTION.md`, and each excluded feature appears in section 13 with its reason (review).
 
 ## Reopen when
 
-The product roadmap dates a derivatives, margin or fiat product, or the number of spot pairs exceeds what the stage 0 matching pool carries in the AD-P1-20 benchmark.
+The product roadmap dates a derivatives, margin or fiat product, or the number of spot pairs exceeds what the stage 0 matching pool carries in the matching part of the benchmark of section 7.4 of `SOLUTION.md`.

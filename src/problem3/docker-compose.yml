@@ -52,7 +52,7 @@ services:
           memory: 256M
 
   postgres:
-    image: postgres:15
+    image: postgres:15.19-alpine@sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984
     command: ["postgres", "-c", "max_connections=30"]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-admin}
@@ -76,7 +76,7 @@ services:
           memory: 512M
 
   redis:
-    image: redis:7
+    image: redis:7.4-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
     command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
     restart: unless-stopped
     networks: [backend]

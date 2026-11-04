@@ -48,7 +48,9 @@ elif [ "$host" = "${FAKE_BACKEND_HOST:-backend.test}" ]; then
       if [ "${FAKE_BACKEND_HEALTH:-up}" = "up" ]; then code=200; echo '{"status":"ok"}' > "$tmp"; else code=503; echo '{}' > "$tmp"; fi ;;
     /version)
       code=200
-      printf '{"sha":"%s","committed_at":null,"api_version":%s}\n' "${FAKE_BACKEND_SHA:-unknown}" "${FAKE_BACKEND_API:-1}" > "$tmp" ;;
+      served="${FAKE_BACKEND_SHA:-unknown}"
+      [ "$served" != "deployed" ] || served="$(cat "$FAKE_AWS_STATE/deployed-sha" 2> /dev/null || echo unknown)"
+      printf '{"sha":"%s","committed_at":null,"api_version":%s}\n' "$served" "${FAKE_BACKEND_API:-1}" > "$tmp" ;;
   esac
   body="$tmp"
 elif [ "$host" = "${FAKE_OIDC_HOST:-oidc.test}" ]; then

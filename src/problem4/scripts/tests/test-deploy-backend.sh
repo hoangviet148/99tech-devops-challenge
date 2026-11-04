@@ -181,7 +181,37 @@ test_no_healthy_target_fails_the_check() {
   assert_eq "a fleet with no healthy target fails and returns to the previous release" 3 $?
 }
 
-run_tests test_production_requires_staging_record test_production_refuses_a_build_record_of_another_digest \
+test_alarm_raised_during_the_deploy_rolls_back() {
+  local digest
+  first_release
+  digest="$(publish_artifact bbbbbbb 1)"
+  : > "$FAKE_AWS_LOG"
+  FAKE_ALARM_STATES="OK,OK ALARM,OK" FAKE_BACKEND_SHA=deployed deploy --sha bbbbbbb --sha256 "$digest"
+  assert_eq "an alarm that enters ALARM during the deploy returns to the previous release with exit 3" 3 $?
+  assert_logged "the alarms are read by name" "cloudwatch describe-alarms --alarm-names backend-staging-target-5xx-rate backend-staging-unhealthy-hosts"
+  assert_logged "the previous release is deployed again" "--description release aaaaaaa"
+  assert_eq "the return deploy does not read the alarms again" 2 "$(grep -c '^cloudwatch describe-alarms' "$FAKE_AWS_LOG" | tr -d ' ')"
+}
+
+test_alarm_already_raised_does_not_fail_the_deploy() {
+  local digest
+  first_release
+  digest="$(publish_artifact bbbbbbb 1)"
+  FAKE_ALARM_STATES="OK,ALARM OK,ALARM" FAKE_BACKEND_SHA=deployed deploy --sha bbbbbbb --sha256 "$digest"
+  assert_eq "an alarm that was in ALARM before the deploy does not fail it" 0 $?
+}
+
+test_first_deploy_ignores_the_alarms() {
+  local digest
+  digest="$(publish_artifact aaaaaaa 1)"
+  : > "$FAKE_AWS_LOG"
+  FAKE_ALARM_STATES="ALARM,ALARM" FAKE_BACKEND_SHA=aaaaaaa deploy --sha aaaaaaa --sha256 "$digest"
+  assert_eq "the first deploy succeeds while the unhealthy-hosts alarm is raised by instances without a release" 0 $?
+  assert_not_logged "the first deploy reads no alarm" "cloudwatch describe-alarms"
+}
+
+run_tests test_alarm_raised_during_the_deploy_rolls_back test_alarm_already_raised_does_not_fail_the_deploy test_first_deploy_ignores_the_alarms \
+  test_production_requires_staging_record test_production_refuses_a_build_record_of_another_digest \
   test_rollback_to_a_release_never_deployed_here_is_refused test_draining_target_does_not_fail_the_check test_no_healthy_target_fails_the_check \
   test_deploy_checks_the_whole_fleet test_wrong_checksum_never_deploys test_missing_artifact_never_deploys \
   test_failed_last_instance_rolls_back test_failed_smoke_after_success_rolls_back test_vetoed_rollback_stops_and_pages \

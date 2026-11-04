@@ -10,8 +10,10 @@ Usage: deploy-backend.sh --env ENV --sha SHA --artifact-bucket BUCKET --sha256 H
                          --frontend-manifest-bucket BUCKET --base-url URL [--rollback] [--require-staging-record] [--dry-run]
 
 Deploys backend-SHA.tgz through CodeDeploy and checks the whole fleet afterwards, or with --rollback redeploys
-a release recorded in the manifest. Exit codes: 0 deployed, 1 failed before the deployment started,
-3 failed and rolled back, 4 failed and the rollback failed too, 5 failed and the rollback was vetoed.
+a release recorded in the manifest. A deploy that replaces a recorded release also fails when the alarm
+GROUP-target-5xx-rate or GROUP-unhealthy-hosts enters ALARM during it. Exit codes: 0 deployed, 1 failed before
+the deployment started, 3 failed and rolled back, 4 failed and the rollback failed too, 5 failed and the
+rollback was vetoed.
 EOF
 }
 
@@ -55,7 +57,7 @@ printf '%s' "$sha" | grep -Eq '^[0-9a-f]{7,40}$' || die "--sha must be a hex com
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 record_prefix="$env_name/backend/"
-
+alarm_names=("$group-target-5xx-rate" "$group-unhealthy-hosts")
 
 read_object() {
   aws_call s3api get-object --bucket "$1" --key "$2" "$work/object.json" > /dev/null
@@ -84,8 +86,13 @@ artifact_version() {
   echo "$head" | jq -r '.VersionId'
 }
 
+alarms_in_alarm() {
+  aws_call cloudwatch describe-alarms --alarm-names "${alarm_names[@]}" |
+    jq -r '[.MetricAlarms[]? | select(.StateValue == "ALARM") | .AlarmName] | sort | join(" ")'
+}
+
 deploy_release() {
-  local target="$1" version="$2" id statuses health targets
+  local target="$1" version="$2" watch_alarms="$3" id statuses health targets raised alarm
   id="$(aws_call deploy create-deployment --application-name "$application" --deployment-group-name "$group" \
     --deployment-config-name CodeDeployDefault.OneAtATime --file-exists-behavior OVERWRITE --description "release $target" \
     --s3-location "bucket=$artifact_bucket,key=backend/$target.tgz,bundleType=tgz,version=$version" | jq -r '.deploymentId // empty')"
@@ -100,6 +107,15 @@ deploy_release() {
   health="$(aws_call elbv2 describe-target-health --target-group-arn "$target_group" | jq -r '[.TargetHealthDescriptions[].TargetHealth.State]')"
   printf '%s' "$health" | jq -e 'any(. == "healthy") and all(. == "healthy" or . == "draining")' > /dev/null ||
     { log "target group health: $(printf '%s' "$health" | jq -c .)"; return 1; }
+  if [ "$watch_alarms" -eq 1 ]; then
+    raised="$(alarms_in_alarm)" || { log "the alarms of $group could not be read after deployment $id"; return 1; }
+    for alarm in $raised; do
+      case " $alarms_before " in
+        *" $alarm "*) log "alarm $alarm was already in ALARM before deployment $id" ;;
+        *) log "alarm $alarm went into ALARM during deployment $id"; return 1 ;;
+      esac
+    done
+  fi
   bash "$(dirname "$0")/smoke.sh" backend --base-url "$base_url" --sha "$target"
 }
 
@@ -162,7 +178,13 @@ fi
 
 kind="deploy"
 [ "$rollback" -eq 1 ] && kind="rollback"
-if deploy_release "$sha" "$version"; then
+watch_alarms=0
+alarms_before=""
+if [ "$rollback" -eq 0 ] && [ -n "$previous_sha" ]; then
+  watch_alarms=1
+  alarms_before="$(alarms_in_alarm)" || die "the alarms of $group could not be read"
+fi
+if deploy_release "$sha" "$version" "$watch_alarms"; then
   write_record "$previous_sha" "$version" "$api_version" "$kind"
   log "release $sha deployed"
   exit 0
@@ -178,6 +200,6 @@ if [ "$previous_api" -lt "$required" ]; then
   exit 5
 fi
 log "release $sha failed, returning to $previous_sha"
-if deploy_release "$previous_sha" "$previous_version"; then exit 3; fi
+if deploy_release "$previous_sha" "$previous_version" 0; then exit 3; fi
 log "previous release $previous_sha failed too"
 exit 4

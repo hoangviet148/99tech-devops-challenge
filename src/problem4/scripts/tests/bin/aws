@@ -106,6 +106,9 @@ case "$service $op" in
     ;;
   "deploy create-deployment")
     count=$(( $(grep -c '^deploy create-deployment' "$FAKE_AWS_LOG") ))
+    location="$(arg --s3-location || true)"
+    deployed="${location#*key=backend/}"
+    printf '%s\n' "${deployed%%.tgz*}" > "$FAKE_AWS_STATE/deployed-sha"
     echo "{\"deploymentId\": \"d-FAKE$count\"}"
     ;;
   "deploy wait")
@@ -121,6 +124,22 @@ case "$service $op" in
     statuses="$(printf '%s' "${FAKE_TARGET_STATUSES:-Succeeded,Succeeded}" | cut -d' ' -f"$count")"
     [ -n "$statuses" ] || statuses="Succeeded,Succeeded"
     printf '%s' "$statuses" | tr ',' '\n' | jq -R . | jq -s '{deploymentTargets: [to_entries[] | {instanceTarget: {targetId: ("i-000" + ((.key + 1) | tostring)), status: .value}}]}'
+    ;;
+  "cloudwatch describe-alarms")
+    count=$(( $(grep -c '^cloudwatch describe-alarms' "$FAKE_AWS_LOG") ))
+    states="$(printf '%s' "${FAKE_ALARM_STATES:-OK,OK}" | cut -d' ' -f"$count")"
+    [ -n "$states" ] || states="OK,OK"
+    names=()
+    collecting=0
+    for a in "${ARGS[@]}"; do
+      case "$a" in
+        --alarm-names) collecting=1 ;;
+        --*) collecting=0 ;;
+        *) [ "$collecting" -eq 1 ] && names+=("$a") ;;
+      esac
+    done
+    printf '%s\n' "${names[@]}" | jq -R . | jq -s --arg states "$states" \
+      '($states | split(",")) as $s | {MetricAlarms: [to_entries[] | {AlarmName: .value, StateValue: ($s[.key] // "OK")}]}'
     ;;
   "elbv2 describe-target-health")
     count=$(( $(grep -c '^elbv2 describe-target-health' "$FAKE_AWS_LOG") ))

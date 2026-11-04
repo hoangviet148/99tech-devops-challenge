@@ -599,7 +599,7 @@ done
   echo "|---|---|"
   echo "| Run | $RUN_ID |"
   tree_state="clean working tree"
-  [ -z "$(git -C "$STACK_DIR" status --porcelain -- . 2>/dev/null)" ] || tree_state="uncommitted changes present"
+  [ -z "$(git -C "$STACK_DIR" status --porcelain -- . ':(exclude)docs' ':(exclude)evidence' 2>/dev/null)" ] || tree_state="uncommitted changes present"
   echo "| Stack | \`$(basename "$(dirname "$STACK_DIR")")/$(basename "$STACK_DIR")\` at commit \`$(git -C "$STACK_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)\`, $tree_state |"
   echo "| Docker | $(docker version --format '{{.Server.Version}} on {{.Server.Os}}/{{.Server.Arch}}'), Compose $(docker compose version --short) |"
   echo

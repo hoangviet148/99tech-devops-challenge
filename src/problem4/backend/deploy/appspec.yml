@@ -1,0 +1,27 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/backend/incoming
+file_exists_behavior: OVERWRITE
+hooks:
+  ApplicationStop:
+    - location: deploy/hooks/application-stop.sh
+      timeout: 60
+      runas: root
+  BeforeInstall:
+    - location: deploy/hooks/before-install.sh
+      timeout: 60
+      runas: root
+  AfterInstall:
+    - location: deploy/hooks/after-install.sh
+      timeout: 120
+      runas: root
+  ApplicationStart:
+    - location: deploy/hooks/application-start.sh
+      timeout: 60
+      runas: root
+  ValidateService:
+    - location: deploy/hooks/validate-service.sh
+      timeout: 120
+      runas: root

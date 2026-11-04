@@ -1,0 +1,96 @@
+name: backend-cd
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/backend-cd.yml'
+      - '.github/workflows/_deploy-backend.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: build
+        run: |
+          bash scripts/build-backend.sh --sha "$GITHUB_SHA" --out out
+          echo "digest=$(cut -d' ' -f1 "out/backend-$GITHUB_SHA.tgz.sha256")" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: out/backend-${{ github.sha }}.tgz
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: backend
+          format: spdx-json
+          output-file: out/backend-${{ github.sha }}.spdx.json
+          upload-artifact: false
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-${{ github.sha }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Assert OIDC claims
+        run: |
+          args=(--audience sts.amazonaws.com --expect-sub "$EXPECTED_SUB")
+          if [ "$DEPLOY_ENABLED" = "true" ]; then args+=(--require-sub); fi
+          bash scripts/oidc-claims.sh "${args[@]}"
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          EXPECTED_SUB: ${{ vars.BACKEND_BUILD_OIDC_SUB }}
+      - if: vars.DEPLOY_ENABLED == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.BACKEND_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+      - name: Publish the artifact
+        run: |
+          args=(--app backend --sha "$GITHUB_SHA" --dir out --bucket "$ARTIFACT_BUCKET" --manifest-bucket "$MANIFEST_BUCKET")
+          [ "$DEPLOY_ENABLED" = "true" ] || args+=(--dry-run)
+          bash scripts/publish-artifact.sh "${args[@]}"
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+          MANIFEST_BUCKET: ${{ vars.MANIFEST_BUCKET }}
+
+  staging:
+    needs: build
+    uses: ./.github/workflows/_deploy-backend.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    with:
+      environment: backend-staging
+      env_name: staging
+      sha: ${{ github.sha }}
+      digest: ${{ needs.build.outputs.digest }}
+
+  production:
+    needs: [build, staging]
+    uses: ./.github/workflows/_deploy-backend.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    with:
+      environment: backend-production
+      env_name: production
+      sha: ${{ github.sha }}
+      digest: ${{ needs.build.outputs.digest }}

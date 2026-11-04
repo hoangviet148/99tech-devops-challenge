@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+: "${FAKE_AWS_STATE:?}"
+out=""
+fmt=""
+url=""
+method="GET"
+data=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -w) fmt="$2"; shift 2 ;;
+    -m|--max-time|-H|--header) shift 2 ;;
+    -X) method="$2"; shift 2 ;;
+    -d|--data|--data-binary) data="$2"; method="POST"; shift 2 ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
+  esac
+done
+printf '%s %s\n' "$method" "$url" >> "${FAKE_CURL_LOG:-/dev/null}"
+[ -n "$data" ] && printf '%s\n' "$data" >> "${FAKE_CURL_LOG:-/dev/null}"
+
+host="$(printf '%s' "$url" | sed -E 's#^https?://([^/]+).*#\1#')"
+path="$(printf '%s' "$url" | sed -E 's#^https?://[^/]+##')"
+path="${path%%\?*}"
+[ -n "$path" ] || path="/"
+code=404
+ctype="text/plain"
+body=""
+
+if [ "$host" = "${FAKE_FRONTEND_HOST:-frontend.test}" ]; then
+  bucket="${FAKE_FRONTEND_BUCKET:-frontend-bucket}"
+  key="${path#/}"
+  last="${key##*/}"
+  case "$last" in *.*) ;; *) key="index.html" ;; esac
+  file="$FAKE_AWS_STATE/s3/$bucket/$key"
+  if [ -f "$file" ]; then
+    code=200
+    ctype="$(jq -r '.ContentType // "application/octet-stream"' "$FAKE_AWS_STATE/meta/$bucket/$key.json")"
+    body="$file"
+  fi
+elif [ "$host" = "${FAKE_BACKEND_HOST:-backend.test}" ]; then
+  ctype="application/json"
+  tmp="$(mktemp)"
+  case "$path" in
+    /healthz)
+      if [ "${FAKE_BACKEND_HEALTH:-up}" = "up" ]; then code=200; echo '{"status":"ok"}' > "$tmp"; else code=503; echo '{}' > "$tmp"; fi ;;
+    /version)
+      code=200
+      printf '{"sha":"%s","committed_at":null,"api_version":%s}\n' "${FAKE_BACKEND_SHA:-unknown}" "${FAKE_BACKEND_API:-1}" > "$tmp" ;;
+  esac
+  body="$tmp"
+elif [ "$host" = "${FAKE_OIDC_HOST:-oidc.test}" ]; then
+  code=200
+  ctype="application/json"
+  tmp="$(mktemp)"
+  printf '{"value":"%s"}\n' "${FAKE_OIDC_TOKEN:-}" > "$tmp"
+  body="$tmp"
+elif [ "$host" = "${FAKE_WEBHOOK_HOST:-hooks.test}" ]; then
+  code=200
+  ctype="text/plain"
+fi
+
+if [ -n "$out" ] && [ -n "$body" ]; then cp "$body" "$out"; elif [ -n "$out" ]; then : > "$out"; elif [ -n "$body" ]; then cat "$body"; fi
+if [ -n "$fmt" ]; then
+  printf '%s' "$fmt" | sed -e "s#%{http_code}#$code#" -e "s#%{content_type}#$ctype#"
+fi
+[ "$code" -lt 400 ] || exit 22
+exit 0

@@ -1,0 +1,103 @@
+name: _deploy-backend
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      env_name:
+        type: string
+        required: true
+      sha:
+        type: string
+        required: true
+      digest:
+        type: string
+        required: false
+        default: ""
+      rollback:
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-${{ inputs.env_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    env:
+      ENV_NAME: ${{ inputs.env_name }}
+      SHA: ${{ inputs.sha }}
+      DIGEST: ${{ inputs.digest }}
+      ROLLBACK: ${{ inputs.rollback }}
+      DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - if: ${{ !inputs.rollback }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: backend-${{ inputs.sha }}
+          path: out
+      - name: Verify build provenance
+        if: ${{ !inputs.rollback }}
+        run: >-
+          bash scripts/verify-provenance.sh --artifact "out/backend-$SHA.tgz" --repo "$GITHUB_REPOSITORY"
+          --signer-workflow .github/workflows/backend-cd.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Assert OIDC claims
+        run: |
+          args=(--audience sts.amazonaws.com --expect-sub "$EXPECTED_SUB")
+          if [ "$DEPLOY_ENABLED" = "true" ]; then args+=(--require-sub); fi
+          bash scripts/oidc-claims.sh "${args[@]}"
+        env:
+          EXPECTED_SUB: ${{ vars.OIDC_EXPECTED_SUB }}
+      - if: vars.DEPLOY_ENABLED == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          audience: sts.amazonaws.com
+      - name: Refuse a stale promotion
+        run: |
+          args=(--app backend --env "$ENV_NAME" --sha "$SHA" --manifest-bucket "$MANIFEST_BUCKET")
+          if [ "$ROLLBACK" = "true" ]; then args+=(--rollback); fi
+          [ "$DEPLOY_ENABLED" = "true" ] || args+=(--dry-run)
+          bash scripts/check-forward.sh "${args[@]}"
+        env:
+          MANIFEST_BUCKET: ${{ vars.MANIFEST_BUCKET }}
+      - name: Deploy
+        run: |
+          args=(--env "$ENV_NAME" --sha "$SHA" --artifact-bucket "$ARTIFACT_BUCKET" --application "$CODEDEPLOY_APPLICATION"
+            --deployment-group "$CODEDEPLOY_GROUP" --target-group-arn "$TARGET_GROUP_ARN" --manifest-bucket "$MANIFEST_BUCKET"
+            --frontend-manifest-bucket "$MANIFEST_BUCKET" --base-url "$BASE_URL")
+          if [ "$ROLLBACK" = "true" ]; then args+=(--rollback); else args+=(--sha256 "$DIGEST"); fi
+          if [ "$ENV_NAME" = "production" ] && [ "$ROLLBACK" != "true" ]; then args+=(--require-staging-record); fi
+          [ "$DEPLOY_ENABLED" = "true" ] || args+=(--dry-run)
+          bash scripts/deploy-backend.sh "${args[@]}"
+        env:
+          ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+          MANIFEST_BUCKET: ${{ vars.MANIFEST_BUCKET }}
+          CODEDEPLOY_APPLICATION: ${{ vars.CODEDEPLOY_APPLICATION }}
+          CODEDEPLOY_GROUP: ${{ vars.CODEDEPLOY_GROUP }}
+          TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
+          BASE_URL: ${{ vars.BASE_URL }}
+      - name: Summary
+        if: always()
+        run: bash scripts/summary.sh --app backend --env "$ENV_NAME" --sha "$SHA" --digest "${DIGEST:-rollback}" --status "$STATUS"
+        env:
+          STATUS: ${{ job.status }}
+          NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}

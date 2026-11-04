@@ -1,0 +1,35 @@
+[Unit]
+Description=Backend HTTP API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=backend
+Group=backend
+WorkingDirectory=/opt/backend/current
+EnvironmentFile=-/etc/backend/backend.env
+Environment=NODE_ENV=production
+Environment=PORT=8080
+ExecStart=/opt/node/bin/node /opt/backend/current/dist/src/index.js
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/opt/backend
+
+[Install]
+WantedBy=multi-user.target

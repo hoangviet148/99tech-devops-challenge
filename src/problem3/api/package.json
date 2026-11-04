@@ -8,6 +8,7 @@
   "dependencies": {
     "express": "^4.22.3",
     "ioredis": "^5.11.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "prom-client": "^15.1.3"
   }
 }

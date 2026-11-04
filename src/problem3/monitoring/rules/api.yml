@@ -1,0 +1,48 @@
+groups:
+  - name: api
+    rules:
+      - alert: ApiProbeFailing
+        expr: probe_success{job="blackbox"} == 0 or absent(probe_success{job="blackbox"})
+        for: 15s
+        labels:
+          severity: page
+        annotations:
+          summary: The probe of /api/users through nginx failed twice in a row or stopped reporting
+          runbook: monitoring/README.md#apiprobefailing
+
+      - alert: Api5xxRatioHigh
+        expr: |
+          sum(rate(http_request_duration_seconds_count{route="/api/users",status_class="5xx"}[5m]))
+            / sum(rate(http_request_duration_seconds_count{route="/api/users"}[5m])) > 0.01
+        labels:
+          severity: page
+        annotations:
+          summary: More than 1 % of /api/users responses were 5xx over 5 minutes
+          runbook: monitoring/README.md#api5xxratiohigh
+
+      - alert: PgPoolSaturated
+        expr: max(pg_pool_waiting_requests) > 0
+        for: 2m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Requests have waited for a database pool client for 2 minutes
+          runbook: monitoring/README.md#pgpoolsaturated
+
+      - alert: ApiLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route="/api/users"}[5m]))) > 0.1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The p99 latency of /api/users stayed above 100 ms for 10 minutes
+          runbook: monitoring/README.md#apilatencyp99high
+
+      - alert: RedisWriteFailures
+        expr: sum(increase(redis_write_failures_total[10m])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: Writes of last_call to Redis failed in the last 10 minutes
+          runbook: monitoring/README.md#rediswritefailures

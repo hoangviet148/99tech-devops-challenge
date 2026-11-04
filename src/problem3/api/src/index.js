@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const express = require("express");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
+const metrics = require("prom-client");
 
 const PORT = Number(process.env.PORT || 3000);
 const POOL_MAX = Number(process.env.PG_POOL_MAX || 4);
@@ -28,6 +29,22 @@ const DB_UNAVAILABLE_CODES = new Set([
   "57P02",
   "57P03",
 ]);
+
+const registry = new metrics.Registry();
+metrics.collectDefaultMetrics({ register: registry });
+const ROUTES = new Set(["/api/users", "/healthz", "/readyz", "/status", "/internal/pool", "/metrics"]);
+const httpDuration = new metrics.Histogram({
+  name: "http_request_duration_seconds",
+  help: "HTTP request duration by route template, method and status class",
+  labelNames: ["route", "method", "status_class"],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+  registers: [registry],
+});
+const redisWriteFailures = new metrics.Counter({
+  name: "redis_write_failures_total",
+  help: "Failed writes of last_call to Redis",
+  registers: [registry],
+});
 
 function log(level, msg, fields = {}) {
   process.stdout.write(`${JSON.stringify({ time: new Date().toISOString(), level, msg, ...fields })}\n`);
@@ -56,6 +73,24 @@ const pool = new Pool({
   application_name: "api",
 });
 pool.on("error", (err) => log("warn", "idle database client failed", { error: err.message }));
+new metrics.Gauge({
+  name: "pg_pool_clients",
+  help: "Database pool clients by state",
+  labelNames: ["state"],
+  registers: [registry],
+  collect() {
+    this.set({ state: "total" }, pool.totalCount);
+    this.set({ state: "idle" }, pool.idleCount);
+  },
+});
+new metrics.Gauge({
+  name: "pg_pool_waiting_requests",
+  help: "Requests waiting for a database pool client",
+  registers: [registry],
+  collect() {
+    this.set(pool.waitingCount);
+  },
+});
 
 const readinessPool = new Pool({
   max: 1,
@@ -88,6 +123,7 @@ function flushLastCall() {
     .set("last_call", value)
     .catch((err) => {
       lastCall.failures += 1;
+      redisWriteFailures.inc();
       redisLog("warn", "redis write failed", { error: err.message });
     })
     .finally(() => {
@@ -141,6 +177,11 @@ app.disable("x-powered-by");
 app.use((req, res, next) => {
   req.id = req.get("x-request-id") || crypto.randomUUID();
   res.set("X-Request-ID", req.id);
+  const stop = httpDuration.startTimer();
+  res.on("finish", () => {
+    const route = ROUTES.has(req.path) ? req.path : "other";
+    stop({ route, method: req.method, status_class: `${Math.floor(res.statusCode / 100)}xx` });
+  });
   next();
 });
 
@@ -200,6 +241,11 @@ app.get("/internal/pool", (req, res) => {
     waiting: pool.waitingCount,
     redis_write_failures: lastCall.failures,
   });
+});
+
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", registry.contentType);
+  res.send(await registry.metrics());
 });
 
 app.use((err, req, res, next) => {

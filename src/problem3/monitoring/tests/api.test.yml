@@ -1,0 +1,146 @@
+rule_files:
+  - ../rules/api.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: probe fails twice in a row
+    interval: 15s
+    input_series:
+      - series: 'probe_success{job="blackbox",instance="http://nginx/api/users"}'
+        values: '1 1 0 0 0'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ApiProbeFailing
+        exp_alerts: []
+      - eval_time: 45s
+        alertname: ApiProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: blackbox
+              instance: http://nginx/api/users
+            exp_annotations:
+              summary: The probe of /api/users through nginx failed twice in a row or stopped reporting
+              runbook: monitoring/README.md#apiprobefailing
+
+  - name: probe stops reporting
+    interval: 15s
+    input_series:
+      - series: 'up{job="api",instance="10.0.0.2:3000"}'
+        values: '1 1 1 1'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ApiProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: blackbox
+            exp_annotations:
+              summary: The probe of /api/users through nginx failed twice in a row or stopped reporting
+              runbook: monitoring/README.md#apiprobefailing
+
+  - name: 5xx ratio above and below 1 %
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/users",method="GET",status_class="2xx"}'
+        values: '0+600x10'
+      - series: 'http_request_duration_seconds_count{route="/api/users",method="GET",status_class="5xx"}'
+        values: '0+12x10'
+      - series: 'http_request_duration_seconds_count{route="/healthz",method="GET",status_class="5xx"}'
+        values: '0+600x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: Api5xxRatioHigh
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: More than 1 % of /api/users responses were 5xx over 5 minutes
+              runbook: monitoring/README.md#api5xxratiohigh
+
+  - name: 5xx ratio of half a percent stays quiet
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/users",method="GET",status_class="2xx"}'
+        values: '0+600x10'
+      - series: 'http_request_duration_seconds_count{route="/api/users",method="GET",status_class="5xx"}'
+        values: '0+3x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: Api5xxRatioHigh
+        exp_alerts: []
+
+  - name: requests wait for a pool client
+    interval: 15s
+    input_series:
+      - series: 'pg_pool_waiting_requests{job="api",instance="10.0.0.2:3000"}'
+        values: '0 2x12'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PgPoolSaturated
+        exp_alerts: []
+      - eval_time: 2m30s
+        alertname: PgPoolSaturated
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Requests have waited for a database pool client for 2 minutes
+              runbook: monitoring/README.md#pgpoolsaturated
+
+  - name: p99 latency above 100 ms for 10 minutes
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="0.05"}'
+        values: '0+90x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="0.1"}'
+        values: '0+95x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="0.25"}'
+        values: '0+100x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: ApiLatencyP99High
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: ApiLatencyP99High
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: The p99 latency of /api/users stayed above 100 ms for 10 minutes
+              runbook: monitoring/README.md#apilatencyp99high
+
+  - name: p99 latency under 50 ms stays quiet
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="0.05"}'
+        values: '0+995x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="0.1"}'
+        values: '0+1000x20'
+      - series: 'http_request_duration_seconds_bucket{route="/api/users",method="GET",status_class="2xx",le="+Inf"}'
+        values: '0+1000x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ApiLatencyP99High
+        exp_alerts: []
+
+  - name: a failed redis write
+    interval: 1m
+    input_series:
+      - series: 'redis_write_failures_total{job="api",instance="10.0.0.2:3000"}'
+        values: '0 0 0 3 3 3'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RedisWriteFailures
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RedisWriteFailures
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Writes of last_call to Redis failed in the last 10 minutes
+              runbook: monitoring/README.md#rediswritefailures

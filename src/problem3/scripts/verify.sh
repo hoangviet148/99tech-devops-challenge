@@ -315,14 +315,17 @@ s2() {
 }
 
 sample_api() {
-  local out="$1" n="$2" i id metrics pool m_rss m_fds rss fds total idle waiting tmax in_use
+  local out="$1" n="$2" i id metrics pool m_rss m_fds m_pg m_rd rss fds total idle waiting tmax in_use pgmax rdmax
   : > "$out"
   for i in $(seq 1 "$n"); do
-    rss=0; fds=0; idle=0; waiting=0; tmax=0; in_use=0
+    rss=0; fds=0; idle=0; waiting=0; tmax=0; in_use=0; pgmax=0; rdmax=0
     for id in $(api_ids); do
-      metrics="$(docker exec "$id" sh -c 'p=$(pidof node) || exit 1; awk "/VmRSS/ { print \$2 }" /proc/$p/status; ls /proc/$p/fd | wc -l' 2>/dev/null | tr '\n' ' ')"
-      read -r m_rss m_fds <<< "$metrics"
+      metrics="$(docker exec "$id" sh -c 'p=$(pidof node) || exit 1; awk "/VmRSS/ { print \$2 }" /proc/$p/status; ls /proc/$p/fd | wc -l
+        cat /proc/$p/net/tcp /proc/$p/net/tcp6 2>/dev/null | awk "\$4 == \"01\" { split(\$3, r, \":\"); if (r[2] == \"1538\") pg++; if (r[2] == \"18EB\") rd++ } END { print pg + 0, rd + 0 }"' 2>/dev/null | tr '\n' ' ')"
+      read -r m_rss m_fds m_pg m_rd <<< "$metrics"
       rss=$((rss + ${m_rss:-0})); fds=$((fds + ${m_fds:-0}))
+      if [ "${m_pg:-0}" -gt "$pgmax" ]; then pgmax="$m_pg"; fi
+      if [ "${m_rd:-0}" -gt "$rdmax" ]; then rdmax="$m_rd"; fi
       pool="$(docker exec "$id" wget -qO- -T 2 http://127.0.0.1:3000/internal/pool 2>/dev/null)"
       if [ -n "$pool" ]; then
         total="$(echo "$pool" | jq -r '.total // 0')"
@@ -334,7 +337,7 @@ sample_api() {
         tmax=-1
       fi
     done
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$rss" "$fds" "$tmax" "$idle" "$waiting" "$in_use" >> "$out"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$rss" "$fds" "$tmax" "$idle" "$waiting" "$in_use" "$pgmax" "$rdmax" >> "$out"
     sleep 2
   done
 }
@@ -342,7 +345,7 @@ sample_api() {
 s3() {
   local name3="Postgres restart under load, 5 times" name10="Pool health across the 5 faults of S3"
   local cycle t0 t_stop t_ready pts bad detail="" ok3=1 ok10=1 detail10="" base_restarts
-  local samples rss fds tmax idle waiting in_use fresh base_rss="" base_fds=""
+  local samples rss fds tmax idle waiting in_use pg_sockets redis_sockets fresh base_rss=""
   files_for S3
   stack_up --scale api=2 || { record S3 "$name3" FAIL "stack did not start"; record S10 "$name10" FAIL "stack did not start"; return; }
   base_restarts="$(restart_total)"
@@ -369,12 +372,14 @@ s3() {
     idle="$(cut -f4 "$samples" | median)"
     waiting="$(cut -f5 "$samples" | sort -n | tail -n 1)"
     in_use="$(cut -f6 "$samples" | median)"
-    if [ "$cycle" -eq 1 ]; then base_rss="$rss"; base_fds="$fds"; fi
+    pg_sockets="$(cut -f7 "$samples" | sort -n | tail -n 1)"
+    redis_sockets="$(cut -f8 "$samples" | sort -n | tail -n 1)"
+    if [ "$cycle" -eq 1 ]; then base_rss="$rss"; fi
     if [ "$fresh" != "200" ] || [ "$tmax" -lt 0 ] || [ "$tmax" -gt "$POOL_MAX" ] || [ "${waiting:-1}" -ne 0 ]; then ok10=0; fi
     if [ "${in_use:-0}" -gt 2 ]; then ok10=0; fi
     if [ "$base_rss" -gt 0 ] && ! le "$rss" "$(awk -v b="$base_rss" 'BEGIN { print b * 1.10 }')"; then ok10=0; fi
-    if [ "$base_fds" -gt 0 ] && ! le "$fds" "$(awk -v b="$base_fds" 'BEGIN { print b * 1.10 }')"; then ok10=0; fi
-    detail10="$detail10 c$cycle: fresh $fresh, pool total max $tmax, waiting $waiting, in use $in_use, idle $idle, RSS ${rss} kB, fds $fds."
+    if [ "${pg_sockets:-99}" -gt $((POOL_MAX + 1)) ] || [ "${redis_sockets:-99}" -gt 1 ]; then ok10=0; fi
+    detail10="$detail10 c$cycle: fresh $fresh, pool total max $tmax, waiting $waiting, in use $in_use, Postgres sockets per replica max $pg_sockets, Redis sockets max $redis_sockets, RSS ${rss} kB, fds $fds."
   done
   local restarts running
   restarts="$(restart_total)"

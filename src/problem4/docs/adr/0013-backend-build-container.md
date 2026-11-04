@@ -34,10 +34,10 @@ The container adds an image pull and a Node download to every backend build, so 
 
 ### Positive
 
-- One Node version runs in CI, in the build container and on the instances.
+- CI and the build container run the version in `backend/.node-version`, and `version.json` records it. `ValidateService` refuses a release on an instance whose runtime is older, so a release never runs on an older runtime than the one it was built and tested with. The instances follow `backend/.node-version` once the environment root is applied, and the README of `infra/terraform/` orders a change: runtime first, then the release.
 - A rerun publishes identical bytes, so `put_immutable` treats it as a no-op.
 - `--ignore-scripts` keeps the install scripts of dependencies out of the build.
-- The bundle carries `appspec.yml` at its root, `dist/`, `deploy/hooks/`, the systemd unit and a `version.json` with the SHA, the commit time and the `api_version` of `backend/openapi.yaml`.
+- The bundle carries `appspec.yml` at its root, `dist/`, `deploy/hooks/`, the systemd unit and a `version.json` with the SHA, the commit time, the `api_version` of `backend/openapi.yaml` and the Node version of the build.
 
 ### Negative
 

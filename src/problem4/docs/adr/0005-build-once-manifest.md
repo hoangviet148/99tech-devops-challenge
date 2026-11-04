@@ -35,7 +35,7 @@ Records are append-only, so a wrong record stays and a newer one corrects it, wh
 ### Positive
 
 - Production receives the SHA-256 that staging ran. Before any deploy step it checks the S3 object checksum, the build record under `builds/` (digest, and for the backend the S3 object version) and a staging record with the same digest.
-- The build record names the S3 object version, which `publish-artifact.sh` reads after the upload. A rerun of the build for the same commit accepts an existing record when its digest and version match, so it never conflicts.
+- The build record names the S3 object version, which `publish-artifact.sh` reads after the upload. A rerun of the build for the same commit accepts an existing record when its digest and version match, so it never conflicts. The build role may read `builds/<app>/` for that comparison, and only write there through conditional writes.
 - A rebuild of the same commit gives the same digest (ADR-P4-0013), so the publish step of a rerun is a no-op.
 - With `--dry-run`, which the workflows pass unless `DEPLOY_ENABLED` is `true`, every AWS call is printed instead of made.
 

@@ -17,3 +17,4 @@ Each record follows the format in `template.md`: context, decision, alternatives
 | [ADR-P4-0011](0011-supply-chain.md) | Supply chain: pinned actions, attestations, SBOM, workflow linters | accepted | 2026-11-04 |
 | [ADR-P4-0012](0012-tested-policy-documents.md) | IAM and bucket policies as tested documents before Terraform | accepted | 2026-11-04 |
 | [ADR-P4-0013](0013-backend-build-container.md) | Backend bundle built in an Amazon Linux 2023 container from the official Node tarball | accepted | 2026-11-04 |
+| [ADR-P4-0014](0014-minimal-terraform.md) | Minimal Terraform for the section 8 prerequisites, planned offline and never applied | accepted | 2026-11-05 |

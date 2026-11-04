@@ -38,11 +38,12 @@ Old assets stay after each deploy because open tabs and rollbacks need them (REL
 - A redeploy of the same bytes is a no-op, and other bytes under the same SHA fail the job.
 - Each release reads `/releases/<sha>/config.json` of its own SHA, so no visitor sees new configuration with old HTML.
 - The reload guard keys on `chunk-reload:<sha>` in `sessionStorage`, so a chunk that stays missing cannot loop a tab.
+- CloudFront answers 404 for `/releases/<sha>/index.html`, so a retained release, including one rolled back for a security bug, is never served as a page. Activation copies that object through the S3 API, which the viewer function does not see.
 
 ### Negative
 
 - The deploy role can overwrite `index.html` without a precondition, the one exception in the bucket policy.
-- Deep links depend on a CloudFront Function that rewrites extension-less paths to `/index.html`, defined with the distribution in `infra/`.
+- Deep links depend on a CloudFront Function that rewrites extension-less paths to `/index.html`, defined with the distribution in `infra/terraform/modules/frontend/rewrite.js`.
 
 ### Risks
 

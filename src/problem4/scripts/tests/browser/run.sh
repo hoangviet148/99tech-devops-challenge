@@ -31,7 +31,9 @@ bash "$scripts/deploy-frontend.sh" --env local --bucket frontend-bucket --distri
 cd "$here"
 npm ci --no-audit --no-fund > /dev/null
 npx playwright install ${PLAYWRIGHT_WITH_DEPS:+--with-deps} chromium > /dev/null
-BUCKET_DIR="$FAKE_AWS_STATE/s3/frontend-bucket" node server.mjs &
+api_origin="$(jq -r .apiBaseUrl "$root/frontend/config/local.json")"
+csp="$(sed "s#<API_ORIGIN>#$api_origin#" "$root/infra/policies/content-security-policy.txt")"
+BUCKET_DIR="$FAKE_AWS_STATE/s3/frontend-bucket" CONTENT_SECURITY_POLICY="$csp" node server.mjs &
 server=$!
 for _ in $(seq 1 50); do "$real_curl" -fs -o /dev/null http://127.0.0.1:4173/ && break; sleep 0.2; done
 "$real_curl" -fs -o /dev/null http://127.0.0.1:4173/ || { echo "the static server did not start" >&2; exit 1; }

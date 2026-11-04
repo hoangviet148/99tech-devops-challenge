@@ -35,7 +35,9 @@ if [ "$host" = "${FAKE_FRONTEND_HOST:-frontend.test}" ]; then
   last="${key##*/}"
   case "$last" in *.*) ;; *) key="index.html" ;; esac
   file="$FAKE_AWS_STATE/s3/$bucket/$key"
-  if [ -f "$file" ]; then
+  if printf '%s' "$path" | grep -Eq '^/releases/.+/index\.html$'; then
+    code=404
+  elif [ -f "$file" ]; then
     code=200
     ctype="$(jq -r '.ContentType // "application/octet-stream"' "$FAKE_AWS_STATE/meta/$bucket/$key.json")"
     body="$file"

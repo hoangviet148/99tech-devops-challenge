@@ -46,6 +46,13 @@ test("an open tab moves to a new activation and back after a rollback", async ({
   expect(errors).toEqual([]);
 });
 
+test("a retained release page is not served", async ({ request }) => {
+  const res = await request.get(`/releases/${RELEASE_A}/index.html`);
+  expect(res.status()).toBe(404);
+  const config = await request.get(`/releases/${RELEASE_A}/config.json`);
+  expect(config.status()).toBe(200);
+});
+
 test("a missing chunk reloads the page once and then renders", async ({ page }) => {
   let requests = 0;
   await page.route(/\/assets\/details-.*\.js$/, async (route) => {

@@ -43,6 +43,7 @@ smoke_frontend() {
   check "deep link" "$base/details" 200 "text/html" || return 1
   check "release config" "$base/releases/$sha/config.json" 200 "application/json" || return 1
   jq -e '.environment and .apiBaseUrl' "$work/body" > /dev/null || { log "smoke release config: invalid JSON"; return 1; }
+  check "release page" "$base/releases/$sha/index.html" 404 "" || return 1
   log "smoke frontend: release $sha serves"
 }
 

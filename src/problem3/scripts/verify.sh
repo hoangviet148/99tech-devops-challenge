@@ -80,18 +80,26 @@ compose() {
   docker compose "${args[@]}" "$@"
 }
 
+toxiproxy_override() {
+  if docker compose --project-directory "$STACK_DIR" -f "$STACK_DIR/docker-compose.yml" config --networks 2>/dev/null | grep -qx backend; then
+    printf '%s\n' "$TESTS_DIR/compose.toxiproxy.split-networks.yml"
+  else
+    printf '%s\n' "$TESTS_DIR/compose.toxiproxy.default-network.yml"
+  fi
+}
+
 files_for() {
   EXTRA=()
   if [ "$PROFILE" = "before" ]; then
     case "$1" in
       S1) ;;
-      S5) EXTRA=("$PROBE_DIR/before-port-fix.yml" "$TESTS_DIR/compose.toxiproxy.before.yml") ;;
+      S5) EXTRA=("$PROBE_DIR/before-port-fix.yml" "$(toxiproxy_override)") ;;
       S7) EXTRA=("$PROBE_DIR/before-port-fix.yml" "$PROBE_DIR/before-init-sql.yml") ;;
       *) EXTRA=("$PROBE_DIR/before-port-fix.yml") ;;
     esac
   else
     case "$1" in
-      S5) EXTRA=("$TESTS_DIR/compose.toxiproxy.after.yml") ;;
+      S5) EXTRA=("$(toxiproxy_override)") ;;
     esac
   fi
 }
@@ -101,16 +109,26 @@ remove_labelled() {
   docker ps -aq --filter "label=$1" | while read -r id; do docker rm -f "$id" >/dev/null 2>&1; done
 }
 
+remove_project() {
+  local label="com.docker.compose.project=$PROJECT" id
+  remove_labelled "$label"
+  docker network ls -q --filter "label=$label" | while read -r id; do docker network rm "$id" >/dev/null 2>&1; done
+  docker volume ls -q --filter "label=$label" | while read -r id; do docker volume rm "$id" >/dev/null 2>&1; done
+  [ -z "$(docker ps -aq --filter "label=$label")" ] || { log "containers of $PROJECT survived the teardown"; return 1; }
+}
+
 down() {
   remove_labelled p3verify.k6=1
   remove_labelled p3verify.placeholder=1
-  compose down -v --remove-orphans >/dev/null 2>&1 || true
+  if ! compose down -v --remove-orphans >"$WORK/down.log" 2>&1; then
+    log "compose down failed, removing $PROJECT by label: $(grep -v obsolete "$WORK/down.log" | tail -n 1)"
+    remove_project
+  fi
 }
 
 # shellcheck disable=SC2329
 cleanup() {
-  EXTRA=("$TESTS_DIR/compose.toxiproxy.after.yml")
-  [ "$PROFILE" = "before" ] && EXTRA=("$TESTS_DIR/compose.toxiproxy.before.yml")
+  EXTRA=()
   down
 }
 trap cleanup EXIT
@@ -144,7 +162,7 @@ nginx_network() {
 }
 
 stack_up() {
-  down
+  down || return 1
   if [ "$PROFILE" = "after" ]; then
     if ! compose up -d --build --wait --wait-timeout 180 "$@" > "$WORK/up.log" 2>&1; then
       log "stack did not become healthy"

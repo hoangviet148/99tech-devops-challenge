@@ -30,6 +30,21 @@ function log(level, msg, fields = {}) {
   process.stdout.write(`${JSON.stringify({ time: new Date().toISOString(), level, msg, ...fields })}\n`);
 }
 
+function throttledLog(intervalMs) {
+  let last = 0;
+  let suppressed = 0;
+  return (level, msg, fields = {}) => {
+    const now = Date.now();
+    if (now - last < intervalMs) {
+      suppressed += 1;
+      return;
+    }
+    log(level, msg, { ...fields, suppressed });
+    last = now;
+    suppressed = 0;
+  };
+}
+
 const pool = new Pool({
   host: process.env.DB_HOST,
   user: "postgres",
@@ -44,7 +59,39 @@ const pool = new Pool({
 });
 pool.on("error", (err) => log("warn", "idle database client failed", { error: err.message }));
 
-const redis = new Redis({ host: process.env.REDIS_HOST, port: 6379 });
+const redisLog = throttledLog(10000);
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: Number(process.env.REDIS_PORT || 6379),
+  enableOfflineQueue: false,
+  commandTimeout: 200,
+  maxRetriesPerRequest: 1,
+  retryStrategy: (times) => Math.min(times * 200, 2000),
+});
+redis.on("error", (err) => redisLog("warn", "redis connection error", { error: err.message }));
+
+const lastCall = { inFlight: false, pending: null, failures: 0 };
+
+function flushLastCall() {
+  const value = lastCall.pending;
+  lastCall.pending = null;
+  lastCall.inFlight = true;
+  redis
+    .set("last_call", value)
+    .catch((err) => {
+      lastCall.failures += 1;
+      redisLog("warn", "redis write failed", { error: err.message });
+    })
+    .finally(() => {
+      lastCall.inFlight = false;
+      if (lastCall.pending !== null) flushLastCall();
+    });
+}
+
+function recordLastCall() {
+  lastCall.pending = String(Date.now());
+  if (!lastCall.inFlight) flushLastCall();
+}
 
 class DeadlineError extends Error {
   constructor() {
@@ -99,7 +146,7 @@ app.get("/api/users", async (req, res) => {
     const result = await dbQuery("SELECT NOW()", [], deadline);
     if (answered) return;
     clearTimeout(timer);
-    await redis.set("last_call", Date.now());
+    recordLastCall();
     res.json({ ok: true, time: result.rows[0] });
   } catch (err) {
     if (answered) return;

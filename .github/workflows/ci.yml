@@ -61,6 +61,7 @@ jobs:
           pattern='^#!(/usr/bin/env |/bin/)(ba)?sh( |$)'
           list="$RUNNER_TEMP/scripts.txt"
           git ls-files | while IFS= read -r file; do
+            [[ "$file" != *.tftpl ]] || continue
             if [[ "$file" == *.sh ]] || { [ -f "$file" ] && head -n 1 -- "$file" | grep -Eq "$pattern"; }; then
               printf '%s\n' "$file"
             fi

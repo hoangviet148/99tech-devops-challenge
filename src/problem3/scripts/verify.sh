@@ -278,6 +278,10 @@ median() { sort -n | awk '{ a[NR] = $1 } END { if (NR == 0) { print 0; exit } pr
 record() {
   printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$RESULTS"
   log "$1 $3: $4"
+  if [ "$3" = "FAIL" ]; then
+    compose ps -a >&2 || true
+    compose logs --no-color --tail 40 nginx api >&2 || true
+  fi
 }
 
 toxic() {

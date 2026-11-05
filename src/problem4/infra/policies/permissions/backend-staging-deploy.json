@@ -1,0 +1,94 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadArtifacts",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
+      ]
+    },
+    {
+      "Sid": "ReadRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/backend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ListRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "s3:prefix": [
+            "staging/backend/",
+            "staging/frontend/"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "WriteOwnRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/backend/*"
+      ]
+    },
+    {
+      "Sid": "DeployOneGroup",
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:CreateDeployment",
+        "codedeploy:GetDeployment",
+        "codedeploy:ListDeploymentTargets",
+        "codedeploy:BatchGetDeploymentTargets",
+        "codedeploy:GetDeploymentConfig",
+        "codedeploy:RegisterApplicationRevision",
+        "codedeploy:GetApplicationRevision"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:<REGION>:<STAGING_ACCOUNT_ID>:deploymentgroup:backend/backend-staging",
+        "arn:aws:codedeploy:<REGION>:<STAGING_ACCOUNT_ID>:application:backend",
+        "arn:aws:codedeploy:<REGION>:<STAGING_ACCOUNT_ID>:deploymentconfig:CodeDeployDefault.OneAtATime"
+      ]
+    },
+    {
+      "Sid": "ReadTargetHealth",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:DescribeTargetHealth"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Sid": "ReadDeployAlarms",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DescribeAlarms"
+      ],
+      "Resource": [
+        "arn:aws:cloudwatch:<REGION>:<STAGING_ACCOUNT_ID>:alarm:backend-staging-target-5xx-rate",
+        "arn:aws:cloudwatch:<REGION>:<STAGING_ACCOUNT_ID>:alarm:backend-staging-unhealthy-hosts"
+      ]
+    }
+  ]
+}

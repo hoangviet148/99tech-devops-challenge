@@ -1,0 +1,69 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/production/frontend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/builds/frontend/*"
+      ]
+    },
+    {
+      "Sid": "ListRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "s3:prefix": [
+            "production/frontend/",
+            "staging/frontend/"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "WriteOwnRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/production/frontend/*"
+      ]
+    },
+    {
+      "Sid": "PublishRelease",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<FRONTEND_BUCKET_PRODUCTION>",
+        "arn:aws:s3:::<FRONTEND_BUCKET_PRODUCTION>/*"
+      ]
+    },
+    {
+      "Sid": "InvalidateOneDistribution",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation"
+      ],
+      "Resource": [
+        "arn:aws:cloudfront::<PRODUCTION_ACCOUNT_ID>:distribution/<DISTRIBUTION_ID_PRODUCTION>"
+      ]
+    }
+  ]
+}

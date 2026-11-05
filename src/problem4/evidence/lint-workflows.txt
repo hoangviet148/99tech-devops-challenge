@@ -1,0 +1,14 @@
+# bash scripts/lint-workflows.sh on 1e7b976 plus the uncommitted fix of this script and dependabot.yml, 2026-11-04T17:02:35Z
+== actionlint
+== zizmor
+ INFO zizmor: 🌈 zizmor v1.31.1
+ INFO audit: zizmor: 🌈 completed .github/dependabot.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/_deploy-backend.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/_deploy-frontend.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/backend-cd.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/ci.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/frontend-cd.yml
+ INFO audit: zizmor: 🌈 completed .github/workflows/rollback.yml
+No findings to report. Good job! (6 ignored, 28 suppressed)
+== shellcheck
+exit=0

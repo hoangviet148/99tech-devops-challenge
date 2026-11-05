@@ -1,0 +1,5 @@
+{
+  "environment": "production",
+  "apiBaseUrl": "https://api.example.com",
+  "versionCheckSeconds": 600
+}

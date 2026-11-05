@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+state=/run/fake-systemd
+mkdir -p "$state"
+printf 'systemctl %s\n' "$*" >> "$state/calls.log"
+[ "${1:-}" = "--quiet" ] && shift
+
+stop_service() {
+  if [ -f "$state/pid" ]; then
+    kill "$(cat "$state/pid")" 2> /dev/null || true
+    rm -f "$state/pid"
+  fi
+}
+
+case "${1:-}" in
+  list-unit-files) [ -f /etc/systemd/system/backend.service ] ;;
+  is-active) [ -f "$state/pid" ] && kill -0 "$(cat "$state/pid")" 2> /dev/null ;;
+  daemon-reload | enable) exit 0 ;;
+  stop) stop_service ;;
+  start | restart)
+    stop_service
+    python3 -I /tests/hooks/server.py > "$state/server.log" 2>&1 &
+    echo $! > "$state/pid"
+    ;;
+  *) echo "fake systemctl: unsupported command $*" >&2; exit 1 ;;
+esac

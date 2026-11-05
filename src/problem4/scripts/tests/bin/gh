@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+: "${FAKE_GH_ATTESTATIONS:?}"
+printf 'gh %s\n' "$*" >> "${FAKE_GH_LOG:-/dev/null}"
+[ "${1:-}" = "attestation" ] && [ "${2:-}" = "verify" ] || { echo "fake gh: unsupported command $*" >&2; exit 1; }
+file="$3"
+if command -v sha256sum > /dev/null 2>&1; then digest="$(sha256sum "$file" | cut -d' ' -f1)"; else digest="$(shasum -a 256 "$file" | cut -d' ' -f1)"; fi
+canned="$FAKE_GH_ATTESTATIONS/$digest.json"
+[ -f "$canned" ] || { echo "Error: no attestations found for subject" >&2; exit 1; }
+cat "$canned"

@@ -1,0 +1,45 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WriteOwnArtifacts",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
+      ]
+    },
+    {
+      "Sid": "WriteOwnBuildRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/builds/backend/*"
+      ]
+    },
+    {
+      "Sid": "CheckExistingArtifacts",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
+      ]
+    },
+    {
+      "Sid": "ReadOwnBuildRecords",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>/builds/backend/*"
+      ]
+    }
+  ]
+}

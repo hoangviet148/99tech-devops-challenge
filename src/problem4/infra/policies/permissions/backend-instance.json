@@ -1,0 +1,55 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadReleases",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<ARTIFACT_BUCKET>/backend/*"
+      ]
+    },
+    {
+      "Sid": "ShipLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": [
+        "arn:aws:logs:<REGION>:<ACCOUNT_ID>:log-group:/backend/<ENVIRONMENT>:*"
+      ]
+    },
+    {
+      "Sid": "CodeDeployAgent",
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy-commands-secure:GetDeploymentSpecification",
+        "codedeploy-commands-secure:PollHostCommand",
+        "codedeploy-commands-secure:PutHostCommandAcknowledgement",
+        "codedeploy-commands-secure:PutHostCommandComplete"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Sid": "SessionManager",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:UpdateInstanceInformation",
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}

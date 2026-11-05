@@ -1,0 +1,58 @@
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: Application to roll back
+        type: choice
+        options: [backend, frontend]
+      env_name:
+        description: Environment
+        type: choice
+        options: [staging, production]
+      sha:
+        description: Release SHA recorded in the release manifest
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Check the release SHA
+        run: printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{7,40}$'
+        env:
+          SHA: ${{ inputs.sha }}
+
+  backend:
+    needs: validate
+    if: inputs.app == 'backend'
+    uses: ./.github/workflows/_deploy-backend.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    with:
+      environment: backend-${{ inputs.env_name }}
+      env_name: ${{ inputs.env_name }}
+      sha: ${{ inputs.sha }}
+      rollback: true
+
+  frontend:
+    needs: validate
+    if: inputs.app == 'frontend'
+    uses: ./.github/workflows/_deploy-frontend.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    with:
+      environment: frontend-${{ inputs.env_name }}
+      env_name: ${{ inputs.env_name }}
+      sha: ${{ inputs.sha }}
+      rollback: true

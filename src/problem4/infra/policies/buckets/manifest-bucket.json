@@ -1,0 +1,147 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyInsecureTransport",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    },
+    {
+      "Sid": "DenyUnconditionalWrites",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/*",
+      "Condition": {
+        "Null": {
+          "s3:if-none-match": "true"
+        },
+        "Bool": {
+          "s3:ObjectCreationOperation": "true"
+        }
+      }
+    },
+    {
+      "Sid": "DenyDeletes",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+        "s3:PutLifecycleConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
+      ],
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<DELIVERY_ACCOUNT_ID>:role/retention-admin"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterBuildsBackend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/builds/backend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<DELIVERY_ACCOUNT_ID>:role/backend-build"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterBuildsFrontend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/builds/frontend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<DELIVERY_ACCOUNT_ID>:role/frontend-build"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterProductionBackend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/production/backend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/backend-production-deploy"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterProductionFrontend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/production/frontend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/frontend-production-deploy"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterStagingBackend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/staging/backend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/backend-staging-deploy"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyWriterStagingFrontend",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<MANIFEST_BUCKET>/staging/frontend/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:PrincipalArn": "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/frontend-staging-deploy"
+        }
+      }
+    },
+    {
+      "Sid": "CrossAccountAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/backend-staging-deploy",
+          "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/backend-production-deploy",
+          "arn:aws:iam::<STAGING_ACCOUNT_ID>:role/frontend-staging-deploy",
+          "arn:aws:iam::<PRODUCTION_ACCOUNT_ID>:role/frontend-production-deploy"
+        ]
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::<MANIFEST_BUCKET>",
+        "arn:aws:s3:::<MANIFEST_BUCKET>/*"
+      ]
+    }
+  ]
+}

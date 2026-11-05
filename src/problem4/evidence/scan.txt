@@ -1,0 +1,38 @@
+# bash scripts/scan.sh on 1e7b976 plus the uncommitted --include-dev-deps flag, 2026-11-04T17:03:42Z
+== gitleaks over the git history
+[90m5:03PM[0m [32mINF[0m [1m22 commits scanned.[0m
+[90m5:03PM[0m [32mINF[0m [1mscanned ~406767 bytes (406.77 KB) in 145ms[0m
+[90m5:03PM[0m [32mINF[0m [1mno leaks found[0m
+== trivy fs
+2026-11-04T17:03:43Z	INFO	[vulndb] Need to update DB
+2026-11-04T17:03:43Z	INFO	[vulndb] Downloading vulnerability DB...
+2026-11-04T17:03:43Z	INFO	[vulndb] Downloading artifact...	repo="mirror.gcr.io/aquasec/trivy-db:2"
+2026-11-04T17:04:00Z	INFO	[vulndb] Artifact successfully downloaded	repo="mirror.gcr.io/aquasec/trivy-db:2"
+2026-11-04T17:04:00Z	INFO	[vuln] Vulnerability scanning is enabled
+2026-11-04T17:04:00Z	INFO	[misconfig] Misconfiguration scanning is enabled
+2026-11-04T17:04:00Z	INFO	[checks-client] Need to update the checks bundle
+2026-11-04T17:04:00Z	INFO	[checks-client] Downloading the checks bundle...
+234.57 KiB / 234.57 KiB [--------------------------------------------------------->] 100.00% ? p/s ?234.57 KiB / 234.57 KiB [-----------------------------------------------] 100.00% 2.61 MiB p/s 300ms2026-11-04T17:04:02Z	INFO	[secret] Secret scanning is enabled
+2026-11-04T17:04:02Z	INFO	[secret] If your scanning is slow, please try '--scanners vuln,misconfig' to disable secret scanning
+2026-11-04T17:04:02Z	INFO	[secret] Please see https://trivy.dev/docs/v0.76/guide/scanner/secret#recommendation for faster secret detection
+2026-11-04T17:04:02Z	INFO	[npm] Run "npm install" to collect the license information of packages	dir="scripts/tests/browser/node_modules"
+2026-11-04T17:04:03Z	INFO	Number of language-specific files	num=3
+2026-11-04T17:04:03Z	INFO	[npm] Detecting vulnerabilities...
+2026-11-04T17:04:03Z	INFO	Detected config files	num=0
+
+Report Summary
+
+┌─────────────────────────────────────────┬──────┬─────────────────┬─────────┬───────────────────┐
+│                 Target                  │ Type │ Vulnerabilities │ Secrets │ Misconfigurations │
+├─────────────────────────────────────────┼──────┼─────────────────┼─────────┼───────────────────┤
+│ backend/package-lock.json               │ npm  │        0        │    -    │         -         │
+├─────────────────────────────────────────┼──────┼─────────────────┼─────────┼───────────────────┤
+│ frontend/package-lock.json              │ npm  │        0        │    -    │         -         │
+├─────────────────────────────────────────┼──────┼─────────────────┼─────────┼───────────────────┤
+│ scripts/tests/browser/package-lock.json │ npm  │        0        │    -    │         -         │
+└─────────────────────────────────────────┴──────┴─────────────────┴─────────┴───────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+exit=0

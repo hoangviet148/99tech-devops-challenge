@@ -1,6 +1,6 @@
 # Problem 5 architecture decision records
 
-Each record follows the format in `template.md`: context, decision, alternatives with their trade-offs, consequences, verification and the trigger that would reopen it. Requirement, principle, threat and change IDs refer to [SOLUTION.md](../../SOLUTION.md).
+Each record follows the format in `template.md`: context, decision, alternatives with their trade-offs, consequences, verification and the trigger that would reopen it. Requirement and principle IDs are defined in [requirements.md](../../../../docs/requirements.md) and [principles.md](../../../../docs/principles.md). Threat and change IDs refer to [SOLUTION.md](../../SOLUTION.md).
 
 | ADR | Decision | Status | Date |
 |---|---|---|---|

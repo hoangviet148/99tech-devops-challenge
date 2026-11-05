@@ -1,4 +1,4 @@
-# bash scripts/tests/browser/run.sh on 4c94b7e plus the uncommitted log change of both build scripts, 2026-11-04T17:09:21Z
+# bash scripts/tests/browser/run.sh on 9c63359, 2026-11-05T02:28:36Z
 npm warn EBADENGINE Unsupported engine {
 npm warn EBADENGINE   package: 'frontend@1.0.0',
 npm warn EBADENGINE   required: { node: '>=24 <25' },
@@ -24,7 +24,7 @@ dist/assets/details-HIDIhYpZ.js  0.30 kB │ gzip: 0.20 kB
 dist/assets/index-C4JMlAoh.js    5.01 kB │ gzip: 2.21 kB
 
 ✓ built in 27ms
-17:09:25 built frontend-aaaaaaa.tgz (80b32080041304b59eafb5a0377889e9a2cfd4e23c57e5d23bc8925fa4630c47)
+02:28:39 built frontend-aaaaaaa.tgz (80b32080041304b59eafb5a0377889e9a2cfd4e23c57e5d23bc8925fa4630c47)
 
 > frontend@1.0.0 build
 > tsc -p tsconfig.json --noEmit && vite build
@@ -39,23 +39,24 @@ dist/index.html                  0.38 kB │ gzip: 0.25 kB
 dist/assets/details-HIDIhYpZ.js  0.30 kB │ gzip: 0.20 kB
 dist/assets/index-C4JMlAoh.js    5.01 kB │ gzip: 2.21 kB
 
-✓ built in 25ms
-17:09:26 built frontend-bbbbbbb.tgz (3e9595936346daf55826707242dd02c7ddeda52e84b5af335332c32ab0f2f2d0)
-17:09:27 smoke frontend: release aaaaaaa serves
-17:09:28 recorded deploy of aaaaaaa in local/frontend/20261104T170927.908011Z-aaaaaaa.json
+✓ built in 23ms
+02:28:41 built frontend-bbbbbbb.tgz (3e9595936346daf55826707242dd02c7ddeda52e84b5af335332c32ab0f2f2d0)
+02:28:42 smoke frontend: release aaaaaaa serves
+02:28:42 recorded deploy of aaaaaaa in local/frontend/20261105T022842.047235Z-aaaaaaa.json
 
-Running 5 tests using 1 worker
+Running 6 tests using 1 worker
 
-  ✓  1 [chromium] › release.spec.mjs:24:1 › the active release renders with its own configuration (284ms)
-  ✓  2 [chromium] › release.spec.mjs:32:1 › a deep link renders the SPA (67ms)
-17:09:32 smoke frontend: release bbbbbbb serves
-17:09:32 recorded deploy of bbbbbbb in local/frontend/20261104T170932.298874Z-bbbbbbb.json
-17:09:32 smoke frontend: release aaaaaaa serves
-17:09:32 recorded rollback of aaaaaaa in local/frontend/20261104T170932.795702Z-aaaaaaa.json
+  ✓  1 [chromium] › release.spec.mjs:24:1 › the active release renders with its own configuration (278ms)
+  ✓  2 [chromium] › release.spec.mjs:32:1 › a deep link renders the SPA (69ms)
+02:28:47 smoke frontend: release bbbbbbb serves
+02:28:47 recorded deploy of bbbbbbb in local/frontend/20261105T022847.544488Z-bbbbbbb.json
+02:28:48 smoke frontend: release aaaaaaa serves
+02:28:48 recorded rollback of aaaaaaa in local/frontend/20261105T022848.062415Z-aaaaaaa.json
   ✓  3 [chromium] › release.spec.mjs:38:1 › an open tab moves to a new activation and back after a rollback (2.5s)
-  ✓  4 [chromium] › release.spec.mjs:49:1 › a missing chunk reloads the page once and then renders (116ms)
-  ✓  5 [chromium] › release.spec.mjs:61:1 › a chunk that stays missing does not reload forever (3.1s)
+  ✓  4 [chromium] › release.spec.mjs:49:1 › a retained release page is not served (11ms)
+  ✓  5 [chromium] › release.spec.mjs:56:1 › a missing chunk reloads the page once and then renders (112ms)
+  ✓  6 [chromium] › release.spec.mjs:68:1 › a chunk that stays missing does not reload forever (3.1s)
 
-  5 passed (6.7s)
-scripts/tests/browser/run.sh: line 9: 98904 Terminated: 15          BUCKET_DIR="$FAKE_AWS_STATE/s3/frontend-bucket" node server.mjs
+  6 passed (6.8s)
+scripts/tests/browser/run.sh: line 9: 53875 Terminated: 15          BUCKET_DIR="$FAKE_AWS_STATE/s3/frontend-bucket" CONTENT_SECURITY_POLICY="$csp" node server.mjs
 exit=0

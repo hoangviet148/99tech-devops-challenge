@@ -1,4 +1,4 @@
-# bash scripts/tests/run-all.sh on 1e7b976, 2026-11-04T17:00:27Z
+# bash scripts/tests/run-all.sh on 9c63359, 2026-11-05T02:26:13Z
 == test-check-forward
 # test_descendant_passes
 ok - a descendant of the deployed release passes
@@ -27,6 +27,16 @@ ok - a cancelled job fails the gate
 ok - invalid input is rejected
 # passed 5, failed 0
 == test-deploy-backend
+# test_alarm_raised_during_the_deploy_rolls_back
+ok - an alarm that enters ALARM during the deploy returns to the previous release with exit 3
+ok - the alarms are read by name
+ok - the previous release is deployed again
+ok - the return deploy does not read the alarms again
+# test_alarm_already_raised_does_not_fail_the_deploy
+ok - an alarm that was in ALARM before the deploy does not fail it
+# test_first_deploy_ignores_the_alarms
+ok - the first deploy succeeds while the unhealthy-hosts alarm is raised by instances without a release
+ok - the first deploy reads no alarm
 # test_production_requires_staging_record
 ok - production without a staging record is refused
 ok - no deployment is created without staging evidence
@@ -71,7 +81,7 @@ ok - a rollback to a release that is not retained fails
 # test_dry_run_makes_no_aws_call
 ok - a dry run exits 0
 ok - a dry run makes no AWS call
-# passed 29, failed 0
+# passed 36, failed 0
 == test-deploy-frontend
 # test_production_requires_the_build_record_digest
 ok - production refuses an artifact that the build record does not name
@@ -119,6 +129,14 @@ ok - a dry run exits 0
 ok - a dry run makes no AWS call
 # passed 31, failed 0
 == test-hooks
+Unable to find image 'amazonlinux:2023.12.20261021.0@sha256:c04a1012acc483977f61f7f91c28624a39a621e56a59781319a75dec528be9b6' locally
+docker.io/library/amazonlinux@sha256:c04a1012acc483977f61f7f91c28624a39a621e56a59781319a75dec528be9b6: Pulling from library/amazonlinux
+da3e7a9e0d7c: Pulling fs layer
+da3e7a9e0d7c: Verifying Checksum
+da3e7a9e0d7c: Download complete
+da3e7a9e0d7c: Pull complete
+Digest: sha256:c04a1012acc483977f61f7f91c28624a39a621e56a59781319a75dec528be9b6
+Status: Downloaded newer image for amazonlinux@sha256:c04a1012acc483977f61f7f91c28624a39a621e56a59781319a75dec528be9b6
 ok - the first deployment succeeds without an existing service
 ok - current points to the first release
 ok - the unit file is installed
@@ -129,10 +147,13 @@ ok - the redeployment stops the running service first
 ok - the previous release stays on disk
 ok - validation fails when the service reports another release
 ok - the failure names both releases
+ok - validation fails on a runtime older than the release was built with
+ok - the failure names both runtime versions
+ok - a newer runtime runs the release
 ok - only the configured number of releases is kept
 ok - the current release is kept
 ok - the oldest release is removed
-# passed 13, failed 0
+# passed 16, failed 0
 == test-oidc-claims
 # test_unpinned_subject_passes_without_aws
 ok - an unpinned subject only prints the claims while no AWS access follows

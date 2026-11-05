@@ -1,12 +1,76 @@
-# backend: npm test, frontend: npm test, policies: python3 -I infra/policies/test_policies.py, on 1e7b976, 2026-11-04T17:01:48Z
+# backend: npm test, frontend: npm test, policies: python3 -I infra/policies/test_policies.py, on 9c63359, 2026-11-05T02:28:17Z
 ## backend
+
+> backend@1.0.0 test
+> tsc -p tsconfig.json && node --test "dist/test/**/*.test.js"
+
+▶ backend API
+  ✔ reports health (17.87075ms)
+  ✔ reports the deployed version and the API contract version (2.360417ms)
+  ✔ greets with a default name (1.477792ms)
+  ✔ rejects names outside the allowed pattern (1.169375ms)
+  ✔ returns 404 for unknown paths and 405 for other methods (1.158125ms)
+  ✔ allows CORS only for configured origins (1.188041ms)
+  ✔ never lets a cache store an API response (0.62975ms)
+✔ backend API (30.940417ms)
+✔ reads the version written at build time (2.154042ms)
+✔ falls back to GIT_SHA when no version file exists (0.123416ms)
 ℹ tests 9
+ℹ suites 1
 ℹ pass 9
 ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 191.064417
 ## frontend
+
+> frontend@1.0.0 test
+> vitest run
+
+
+ RUN  v5.1.0 <repo>/src/problem4/frontend
+
+
  Test Files  3 passed (3)
       Tests  14 passed (14)
+   Start at  09:28:20
+   Duration  212ms (tests 48%, transform 30%, import 18%, worker 4%)
+
 ## policies
-Ran 13 tests in 0.007s
+test_each_manifest_prefix_has_one_writer (__main__.BucketPolicies.test_each_manifest_prefix_has_one_writer) ... ok
+test_every_bucket_requires_tls (__main__.BucketPolicies.test_every_bucket_requires_tls) ... ok
+test_frontend_activation_is_the_only_overwrite (__main__.BucketPolicies.test_frontend_activation_is_the_only_overwrite) ... ok
+test_only_backend_principals_read_backend_artifacts (__main__.BucketPolicies.test_only_backend_principals_read_backend_artifacts) ... ok
+test_release_records_and_artifacts_cannot_be_deleted (__main__.BucketPolicies.test_release_records_and_artifacts_cannot_be_deleted) ... ok
+test_unconditional_writes_are_denied (__main__.BucketPolicies.test_unconditional_writes_are_denied) ... ok
+test_csp_allows_only_own_origin_and_the_api (__main__.ContentSecurityPolicy.test_csp_allows_only_own_origin_and_the_api) ... ok
+test_csp_blocks_plugins_framing_and_base_rewrites (__main__.ContentSecurityPolicy.test_csp_blocks_plugins_framing_and_base_rewrites) ... ok
+test_endpoint_policies_name_their_actions (__main__.EndpointPolicies.test_endpoint_policies_name_their_actions) ... ok
+test_interface_endpoints_serve_only_their_own_account (__main__.EndpointPolicies.test_interface_endpoints_serve_only_their_own_account) ... ok
+test_s3_endpoint_reaches_only_releases_packages_and_the_agent (__main__.EndpointPolicies.test_s3_endpoint_reaches_only_releases_packages_and_the_agent) ... ok
+test_backend_deploy_roles_read_only_their_own_alarms (__main__.PermissionPolicies.test_backend_deploy_roles_read_only_their_own_alarms) ... ok
+test_build_roles_read_back_their_own_records (__main__.PermissionPolicies.test_build_roles_read_back_their_own_records) ... ok
+test_build_roles_write_only_their_app (__main__.PermissionPolicies.test_build_roles_write_only_their_app) ... ok
+test_codedeploy_cannot_create_or_destroy_capacity (__main__.PermissionPolicies.test_codedeploy_cannot_create_or_destroy_capacity) ... ok
+test_codedeploy_changes_only_named_resources (__main__.PermissionPolicies.test_codedeploy_changes_only_named_resources) ... ok
+test_codedeploy_passes_only_the_instance_role_to_ec2 (__main__.PermissionPolicies.test_codedeploy_passes_only_the_instance_role_to_ec2) ... ok
+test_deploy_roles_cannot_write_artifacts (__main__.PermissionPolicies.test_deploy_roles_cannot_write_artifacts) ... ok
+test_every_role_has_permissions (__main__.PermissionPolicies.test_every_role_has_permissions) ... ok
+test_frontend_deploy_roles_never_name_the_artifact_bucket (__main__.PermissionPolicies.test_frontend_deploy_roles_never_name_the_artifact_bucket) ... ok
+test_instance_reads_only_backend_releases (__main__.PermissionPolicies.test_instance_reads_only_backend_releases) ... ok
+test_no_role_can_delete_objects (__main__.PermissionPolicies.test_no_role_can_delete_objects) ... ok
+test_no_wildcard_actions (__main__.PermissionPolicies.test_no_wildcard_actions) ... ok
+test_record_reads_are_the_prefixes_the_scripts_read (__main__.PermissionPolicies.test_record_reads_are_the_prefixes_the_scripts_read) ... ok
+test_record_writes_stay_in_own_prefix (__main__.PermissionPolicies.test_record_writes_stay_in_own_prefix) ... ok
+test_codedeploy_is_trusted_for_its_own_account_only (__main__.TrustPolicies.test_codedeploy_is_trusted_for_its_own_account_only) ... ok
+test_every_role_has_a_trust_policy (__main__.TrustPolicies.test_every_role_has_a_trust_policy) ... ok
+test_no_two_roles_share_a_subject (__main__.TrustPolicies.test_no_two_roles_share_a_subject) ... ok
+test_service_roles_trust_one_service (__main__.TrustPolicies.test_service_roles_trust_one_service) ... ok
+test_subjects_pin_environment_and_workflow (__main__.TrustPolicies.test_subjects_pin_environment_and_workflow) ... ok
+test_trust_is_exact_and_audience_bound (__main__.TrustPolicies.test_trust_is_exact_and_audience_bound) ... ok
+
+----------------------------------------------------------------------
+Ran 31 tests in 0.011s
 
 OK

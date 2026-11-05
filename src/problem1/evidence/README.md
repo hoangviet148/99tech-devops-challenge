@@ -3,7 +3,7 @@
 | File | What it holds |
 |---|---|
 | `cost_estimate.py` | The cost model: quantities with the assumption IDs of section 2.3 of `SOLUTION.md`, the account of every row, unit prices with their price list versions and read dates, the support tiers, and the arithmetic behind sections 7 and 8 |
-| `cost-estimate-2026-11-04.md` | The output of `python3 -I cost_estimate.py`, copied into sections 8.3 and 8.4 |
+| `cost-estimate-2026-11-04.md` | The output of `python3 -I cost_estimate.py`, summarized in sections 8.3 and 8.4 |
 
 ## How the prices were read
 
@@ -16,7 +16,7 @@ curl -s -o AmazonMSK.json https://pricing.us-east-1.amazonaws.com/offers/v1.0/aw
 
 The Verified Access prices come from the AmazonVPC offer file. CloudFront, AWS WAF and Shield Advanced publish one global file under the region key `aws-other`. S3 Glacier Deep Archive storage has its own offer code, `AmazonS3GlacierDeepArchive`. Compute Savings Plans rates come from `https://pricing.us-east-1.amazonaws.com/savingsPlan/v1.0/aws/AWSComputeSavingsPlan/20261104004726/ap-southeast-1/index.json`. Reserved rates for Aurora and ElastiCache come from the `Reserved` terms of their offer files, 1 year with no upfront payment. The MSK offer file has on-demand terms only, so MSK has no discounted rate. The Business Support+ fee is a share of each account's charges and has no usage type, so its tiers come from the AWS Support pricing page and sit in the third table of the output.
 
-## Vendor behaviour cited in `SOLUTION.md`
+## Vendor behaviour cited in `SOLUTION.md` and the decision records
 
 | Claim | Source | Read on |
 |---|---|---|
@@ -26,7 +26,6 @@ The Verified Access prices come from the AmazonVPC offer file. CloudFront, AWS W
 | MSK tiered storage needs `cleanup.policy=delete` topics, keeps data in the low-cost tier for at least 3 days, does not run on `t3.small` brokers, and warns against `read_committed` reads from the remote tier unless the client uses transactions | https://docs.aws.amazon.com/msk/latest/developerguide/msk-tiered-storage.html | 2026-11-04 |
 | Compute Savings Plans apply to EC2, Fargate and Lambda only | https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-services.html | 2026-11-04 |
 | Amazon ECS has no charge for orchestration, so ECS on EC2 pays only for instances | https://aws.amazon.com/ecs/pricing/ | 2026-11-04 |
-| The CloudFront flat-rate Premium plan costs 1,000 USD per month per distribution and includes 500 million requests and 50 TB, with larger allowances priced on request | https://aws.amazon.com/cloudfront/pricing/ | 2026-11-04 |
 | For resources protected by Shield Advanced, AWS WAF bills web ACLs, rules and tier 0 requests at 0 USD | Price list usage types `Global-ShieldProtected-WebACLV2`, `Global-ShieldProtected-RuleV2` and `Global-ShieldProtected-RequestV2-Tier0` in `awswaf` version 20260914163921 | 2026-11-04 |
 
 ## Vendor behaviour behind the security column

@@ -1,70 +1,51 @@
 # Problem 4: CI/CD for a backend on EC2 and a frontend on S3
 
-This folder is the root of a small product: a Node.js HTTP API that runs on EC2 behind an ALB, a single-page app served from S3 through CloudFront, and the GitHub Actions pipelines that test, build, deploy and roll back both. Nothing here needs an AWS account to run. Every deploy step runs the real scripts, and without AWS they run in dry-run mode or against a recording fake of the AWS CLI.
+This folder is a small product: a Node.js API on EC2 behind an ALB, a single-page app on S3 behind CloudFront, and the GitHub Actions pipelines that test, build, deploy and roll back both. No AWS account is needed. Every deploy step runs the real scripts, in dry-run mode or against a recording fake of the AWS CLI.
 
 | Path | Content |
 |---|---|
-| `.github/workflows/` | `ci.yml`, `backend-cd.yml`, `frontend-cd.yml`, the reusable `_deploy-backend.yml` and `_deploy-frontend.yml`, and `rollback.yml` |
-| `backend/` | The API (`node:http`, no runtime dependencies), its OpenAPI document, the CodeDeploy `appspec.yml`, hooks and systemd unit |
-| `frontend/` | The Vite SPA, its configuration per environment and its API contract (`contract.json`) |
-| `scripts/` | Build, publish, deploy, smoke, gate, summary and check scripts, with their tests in `scripts/tests/` |
-| `infra/policies/` | IAM trust, role, bucket and VPC endpoint policies as JSON documents and the Content-Security-Policy of the frontend, with static tests |
-| `infra/terraform/` | Terraform for the prerequisites of section 8, planned offline against `infra/policies/` and never applied |
-| `docs/adr/` | One decision record per design decision (ADR-P4-0001 to ADR-P4-0014) |
-| `evidence/` | Output of the static checks and test suites quoted in section 10 |
+| `.github/workflows/` | `ci.yml`, `backend-cd.yml`, `frontend-cd.yml`, the reusable `_deploy-backend.yml` and `_deploy-frontend.yml`, `rollback.yml` |
+| `backend/`, `frontend/` | The two apps, the OpenAPI document, the CodeDeploy hooks and the SPA's per-environment config |
+| `scripts/` | Build, deploy and check scripts, tests in `scripts/tests/` |
+| `infra/policies/` | IAM, bucket and endpoint policies and the Content-Security-Policy as tested documents |
+| [`infra/terraform/`](infra/terraform/README.md) | The prerequisites of section 8, planned offline and never applied |
+| [`docs/adr/`](docs/adr/README.md) | ADR-P4-0001 to ADR-P4-0014, one per decision |
+| [`evidence/`](evidence/README.md) | Captured output of the checks in section 10 |
 
 ## 1. Requirements and principles
 
-| Requirement | Where it is met |
-|---|---|
-| REQ-P4-1 CI/CD for the backend on EC2 | `backend-cd.yml` builds once and deploys through `_deploy-backend.yml` with CodeDeploy (sections 5.2 and 5.4) |
-| REQ-P4-2 CI/CD for the frontend on S3 | `frontend-cd.yml` builds once and deploys through `_deploy-frontend.yml` (sections 5.3 and 5.5) |
-| REQ-P4-3 GitHub Actions | All six workflows, with the hardening in section 6 |
-| REQ-P4-4 A definition of production ready that the pipelines meet | Properties G1 to G11 in section 3 |
-| REQ-P4-5 No real AWS account | Dry-run mode on every AWS step, a fake AWS CLI for the tests, and the acceptance plan in section 10.4 |
-| REQ-P4-6 Workflows, supporting files and this document | This folder |
-
-These AWS Well-Architected design principles drive most decisions here. Section 11 maps each decision to its requirements and principles, and each ADR names the principles it trades against.
-
-| ID | Principle | Where it shows |
-|---|---|---|
-| OPS-DP3 | "Safely automate where possible" | Every deploy, rollback and check is a script that the workflows call |
-| OPS-DP4 | "Make frequent, small, reversible changes" | One-object frontend activation, rolling backend deploys, one-action rollback |
-| SEC-DP1 | "Implement a strong identity foundation" | One OIDC role per app and environment, no stored credentials |
-| SEC-DP2 | "Maintain traceability" | Attestations, SBOMs, append-only release records |
-| SEC-DP3 | "Apply security at all layers" | Bucket policies, environment rules, hardened systemd unit |
-| SEC-DP4 | "Automate security best practices" | Pinning, linters, scanners and policy tests in CI |
-| REL-DP1 | "Automatically recover from failure" | Automatic return to the previous release after a failed check |
-| REL-DP5 | "Manage change through automation" | One lock per environment, forward-only promotion, compatibility gate |
+Section 11 maps the six requirements REQ-P4-1 to REQ-P4-6 of [`docs/requirements.md`](../../docs/requirements.md) to the decisions. Most trade-offs are between these principles of [`docs/principles.md`](../../docs/principles.md): safe automation (OPS-DP3), small reversible changes (OPS-DP4), a strong identity foundation (SEC-DP1), traceability (SEC-DP2), security at all layers (SEC-DP3), automated security (SEC-DP4), automatic recovery (REL-DP1) and change through automation (REL-DP5).
 
 ## 2. Assumptions
 
-| ID | Assumption | Reason | If wrong |
-|---|---|---|---|
-| A1 | `src/problem4` is the root of the product repo, with a backend (Node.js 24, no native modules) and a frontend (Vite SPA). The challenge ships no code for either | Pipelines need real lint, test and build steps to be verifiable | Only the build commands change |
-| A2 | The backend runs as a systemd service on an Auto Scaling group of Amazon Linux 2023 x86_64 instances across at least 2 AZs behind an ALB | Deploys without downtime need at least 2 instances behind a load balancer | A single instance works with the same pipeline and a short outage per deploy |
-| A3 | The frontend is a private S3 bucket behind CloudFront with Origin Access Control | S3 website endpoints are public and HTTP only | Deploy steps stay, cache headers and invalidation change |
-| A4 | Staging and production live in separate AWS accounts | A bad credential or a bad deploy stays inside one account | Role ARNs collapse into one account |
-| A5 | No database migrations | The challenge describes no database | Expand and contract migrations run as their own job before the deploy |
-| A6 | GitHub-hosted runners | The challenge describes no runner fleet | Self-hosted runners need their own hardening |
-| A7 | No AWS account. AWS steps run with `--dry-run` unless the environment variable `DEPLOY_ENABLED` is `true` | The challenge accepts a faithful implementation without AWS | The prerequisites in section 8 must exist first |
-| A8 | Every `versionCheckSeconds` (600 in staging and production) the SPA fetches the root `index.html` without cache and reloads when the release SHA in it differs from its own | That object is the single activation switch, so the check sees activations and rollbacks alike | The asset retention window grows |
+| ID | Assumption | Why it matters |
+|---|---|---|
+| A1 | `src/problem4` is the product repo root. The challenge ships no app, so a Node.js 24 API and a Vite SPA are written here | Lint, test and build steps need real code to be verifiable |
+| A2 | The API runs as a systemd service on an Auto Scaling group of Amazon Linux 2023 x86_64 instances in at least 2 AZs behind an ALB | A rolling deploy without downtime needs 2 instances. With one, the same pipeline causes a short outage per deploy |
+| A3 | The SPA is a private S3 bucket behind CloudFront with Origin Access Control | S3 website endpoints are public and HTTP only |
+| A4 | Staging and production are separate AWS accounts | A bad credential or deploy stays inside one account |
+| A5 | No database | Migrations would run as their own expand-and-contract job before the deploy |
+| A6 | GitHub-hosted runners | Self-hosted runners need hardening of their own |
+| A7 | No AWS account, so AWS steps use `--dry-run` unless `DEPLOY_ENABLED` is `true` | The challenge accepts a faithful implementation |
+| A8 | Every 600 s the SPA fetches the root `index.html` uncached and reloads when its release SHA changed | That one object is the activation switch, so open tabs follow activations and rollbacks |
 
 ## 3. What production ready means here
 
+[ADR-P4-0001](docs/adr/0001-production-ready-properties.md) explains the choice of these eleven properties.
+
 | ID | Property | How the pipelines meet it |
 |---|---|---|
-| G1 | Nothing reaches `main` unverified | A ruleset on `main` requires a PR, the `ci-gate` check and code owner review for `.github/`, `scripts/` and `infra/`, with no bypass. `ci.yml` runs lint, typecheck, unit tests, build, `npm audit --audit-level=high`, the contract test, browser tests, deploy logic tests, policy tests, workflow linters, the offline Terraform check, a secret scan and dependency review. `ci-gate` fails when a needed job failed or was cancelled |
-| G2 | Build once, deploy the same bytes everywhere | Only the build job builds. The artifact gets a SHA-256 digest and a build record. Both deploys verify the digest before any AWS change. The backend packer writes files in a fixed order with fixed owners and the commit time, so a re-run of the build produces the same digest |
-| G3 | Every running version is traceable | Build provenance attestation and an SPDX SBOM per artifact. `GET /version` on the backend and `releases/<sha>/version.json` on the frontend return the commit SHA |
-| G4 | Promotion is gated and its evidence cannot be forged | Release records live in a manifest bucket under `builds/`, `staging/` and `production/`, each writable by one role only, with conditional writes and no deletes. Production verifies the attestation, the digest and a staging record for the same digest |
-| G5 | Rollout is safe and rolls back by itself | CodeDeploy deploys one instance at a time. The job then checks every deployment target, the ALB target health, the two alarms of section 8 and the SHA each instance serves. Any failed check redeploys the previous release, unless G9 vetoes it. The frontend activates one object and returns to the previous release when a check fails |
-| G6 | Manual rollback is one action | `rollback.yml` redeploys a recorded release without a rebuild and refuses one that is no longer retained |
-| G7 | No long-lived credentials, and no role reachable from the wrong job | GitHub OIDC with `aud` set to `sts.amazonaws.com`. Each role trusts one environment and one reusable workflow on `main`. A job asserts the actual `aud` and `sub` before any AWS call |
-| G8 | The pipeline itself is hardened | `permissions: {}` at workflow level, grants per job, actions pinned by SHA, `persist-credentials: false`, no `pull_request_target`, inputs passed through `env:`, `timeout-minutes` on every job, Dependabot |
-| G9 | Deploys happen in order and stay compatible | One concurrency group per environment for both apps, never cancelled. A stale promotion is refused inside the locked job. Frontend activation requires the deployed backend to serve at least the release's `min_backend_api`, and a backend rollback below what a live frontend needs is vetoed |
-| G10 | Dependencies are controlled | `npm ci` with lockfiles, the audit gate, dependency review, `trivy fs` and `gitleaks` |
-| G11 | Failures are visible | A job summary with SHA, digest and status for every deploy, and a failure notification that stays off without a webhook secret |
+| G1 | Nothing reaches `main` unverified | A ruleset requires a PR, the `ci-gate` check and code owner review for `.github/`, `scripts/` and `infra/`, with no bypass |
+| G2 | Build once, deploy the same bytes | One build job per app. Deploys verify the SHA-256 digest before any AWS change. Rebuilding a commit gives the same digest |
+| G3 | Every running version is traceable | Provenance attestation and SPDX SBOM per artifact. `GET /version` and `releases/<sha>/version.json` return the commit SHA |
+| G4 | Promotion is gated and its records cannot be forged | Append-only release records, one writer role per prefix. Production requires the attestation, the digest and a staging record for that digest |
+| G5 | Rollout is safe and rolls back by itself | One instance at a time, then target, health, alarm and SHA checks. A failed check redeploys the previous release unless G9 vetoes it |
+| G6 | Manual rollback is one action | `rollback.yml` redeploys a retained release without a rebuild |
+| G7 | No long-lived credentials | GitHub OIDC, one role per app and environment, each trusting one reusable workflow on `main`. Jobs assert `aud` and `sub` before any AWS call |
+| G8 | The pipeline itself is hardened | `permissions: {}` by default, actions pinned by SHA, `persist-credentials: false`, no `pull_request_target`, inputs through `env:`, timeouts, Dependabot |
+| G9 | Deploys happen in order and stay compatible | One lock per environment that is never cancelled, forward-only promotion, and a frontend that needs a backend serving at least its `min_backend_api` |
+| G10 | Dependencies are controlled | Lockfiles, `npm audit --audit-level=high`, dependency review, `trivy fs`, `gitleaks` |
+| G11 | Failures are visible | Job summary with SHA, digest and status, and a failure webhook when its secret is set |
 
 ## 4. Pipeline flow
 
@@ -85,230 +66,174 @@ flowchart LR
   manual["rollback.yml with a recorded release"] --> prod
 ```
 
-## 5. Workflows
+## 5. How the pipelines work
 
-### 5.1 `ci.yml`
+### 5.1 Pull requests
 
-`changes` decides which jobs a PR needs through path filters. `backend` and `frontend` run lint (Biome), typecheck, unit tests, build and `npm audit` for their app. The frontend unit tests include the contract test, which reads `backend/openapi.yaml` and fails when the frontend's `min_backend_api` exceeds the backend's `x-api-version` or when a field the client reads is missing from the schema. `browser` runs the Playwright tests in section 10.2. `delivery` runs every script test suite and the policy tests. `workflow-lint` runs actionlint, zizmor, shellcheck and the offline Terraform check of section 10.1. `security` runs gitleaks over the git history and `trivy fs`. `dependency-review` blocks PRs that add a dependency with a known high severity advisory. `ci-gate` is the only required check: it passes when every needed job succeeded or was skipped by the path filters.
+`ci.yml` picks jobs by path filter. Each app gets Biome lint, typecheck, unit tests, build and `npm audit`. The frontend tests include a contract test against `backend/openapi.yaml`: it fails when the SPA reads a field the schema lacks or needs a newer `x-api-version` than the backend declares. Other jobs run the Playwright tests, the script suites, the policy tests, the workflow linters, the offline Terraform check, the secret and dependency scans. `ci-gate`, the only required check, passes when each needed job succeeded or was skipped.
 
-### 5.2 `backend-cd.yml`
+### 5.2 Build on `main`
 
-On a push to `main` that touches the backend, the build job runs `scripts/build-backend.sh`. It downloads the Node.js tarball named in `backend/.node-version`, checks it against `backend/node-sha256.txt`, and runs `npm ci --ignore-scripts`, the TypeScript build and a production install inside a pinned `amazonlinux:2023` container. The build fails when a production dependency contains a native addon. `scripts/pack-tgz.py` packs the bundle with sorted entries, owner 0 and the commit time as every timestamp. The job attests the artifact, writes an SBOM, uploads both as a GitHub artifact and, with `DEPLOY_ENABLED`, publishes the artifact, `version.json` and the build record with conditional writes. The staging and production jobs call `_deploy-backend.yml`.
+`backend-cd.yml` builds inside a pinned `amazonlinux:2023` container with the Node.js tarball that `backend/node-sha256.txt` pins, and fails on a native addon ([ADR-P4-0013](docs/adr/0013-backend-build-container.md)). The archive has sorted entries, owner 0 and the commit time, so it is reproducible. `frontend-cd.yml` builds the SPA once with the SHA in `index.html` and packs the config of every environment with `release.json`, which holds `min_backend_api`. Both jobs attest the artifact, write an SBOM and, with `DEPLOY_ENABLED`, publish the artifact and its build record with conditional writes ([ADR-P4-0005](docs/adr/0005-build-once-manifest.md)). Staging, then production after approval, call the reusable deploy workflow.
 
-### 5.3 `frontend-cd.yml`
+### 5.3 Backend deploy
 
-The build job runs `scripts/build-frontend.sh`, which builds the SPA once with the commit SHA embedded in `index.html` and packs `dist/`, the configuration of every environment, `version.json` and `release.json` (with `min_backend_api`). Attestation, SBOM and publishing follow the backend job. The staging and production jobs call `_deploy-frontend.yml`.
+`_deploy-backend.yml` runs in environment `backend-<env>` under the concurrency group `deploy-<env>`. It verifies the attestation (`backend-cd.yml`, `refs/heads/main`, GitHub-hosted runner), checks the OIDC claims, assumes the role, and refuses a SHA that does not descend from the one deployed, except for a rollback.
 
-### 5.4 `_deploy-backend.yml`
+`scripts/deploy-backend.sh` then checks the digest and S3 VersionId, requires a staging record in production, and refuses a release below the `min_backend_api` of a live frontend. It runs CodeDeploy with `CodeDeployDefault.OneAtATime` ([ADR-P4-0003](docs/adr/0003-codedeploy-rolling.md)). That configuration reports success even when the last instance fails. The script therefore checks every target, ALB health, the two alarms of section 8 and the SHA each instance serves, then runs a smoke test. Each instance's `ValidateService` hook also rejects a runtime older than the build's. On failure it redeploys the previous release unless the compatibility gate of [ADR-P4-0007](docs/adr/0007-deploy-lock-compatibility.md) vetoes it.
 
-The job runs in the GitHub environment `backend-staging` or `backend-production` and holds the concurrency group `deploy-<env>` for the whole job. Its steps run in this order:
-
-1. Check out the full history and download the build's GitHub artifact.
-2. `scripts/verify-provenance.sh` requires an attestation signed by `backend-cd.yml` on `refs/heads/main` from a GitHub-hosted runner.
-3. `scripts/oidc-claims.sh` requests the OIDC token, masks it, and fails unless `aud` and `sub` match the values pinned for the environment.
-4. With `DEPLOY_ENABLED`, `configure-aws-credentials` assumes the environment's role.
-5. `scripts/check-forward.sh` refuses a SHA that does not descend from the release already deployed in the environment, unless the run is a rollback.
-6. `scripts/deploy-backend.sh` verifies the object's SHA-256 checksum and VersionId, requires a staging record for production, and refuses a release whose `api_version` is below the `min_backend_api` of the live frontend releases. It creates a CodeDeploy deployment pinned to the S3 VersionId with `CodeDeployDefault.OneAtATime`, waits for it, then reads every deployment target and the ALB target health. CodeDeploy reports success even when the last instance fails with that configuration, so the script does not trust the deployment status alone. When the environment already runs a recorded release, a deploy also fails when either alarm of section 8 enters ALARM during it. An alarm raised before the deployment does not count, and the first deploy and every return to a previous release do not read the alarms. Each instance's `ValidateService` hook compares the SHA from `/version` with the bundle and refuses a runtime older than the one the release was built with. A smoke test follows. On any failure the script redeploys the previous release, unless the compatibility check vetoes that release, in which case it stops with exit code 5 for a person to decide.
-7. `scripts/summary.sh` writes the job summary and, with a webhook secret, the failure notification.
-
-| Exit code of a deploy script | Meaning |
+| Exit code | Meaning |
 |---|---|
 | 0 | Deployed and verified |
-| 1 | Failed before the new release went live, so the environment still serves the previous one |
+| 1 | Failed before the release went live |
 | 2 | Wrong arguments |
-| 3 | Failed after the change, and the previous release is back and verified |
+| 3 | Failed after the change, previous release back and verified |
 | 4 | Failed, and the return to the previous release failed too |
-| 5 | Failed, and the rollback was vetoed by the compatibility check (backend only) |
+| 5 | Failed, and the rollback was vetoed (backend only) |
 
-### 5.5 `_deploy-frontend.yml`
+### 5.4 Frontend deploy
 
-The structure matches the backend job, with `scripts/deploy-frontend.sh` as the deploy step:
+`_deploy-frontend.yml` has the same guards ([ADR-P4-0004](docs/adr/0004-frontend-release-layout.md)). `scripts/deploy-frontend.sh` uploads `assets/` as immutable for one year, never with `--delete`, then the release files under `releases/<sha>/`. Every upload is a conditional write. Activation is one copy of `releases/<sha>/index.html` to the root `index.html` with `no-cache`, followed by an invalidation and a smoke test. A failure after activation copies the previous `index.html` back and smoke-tests it.
 
-1. Upload `assets/` with `Cache-Control: public, max-age=31536000, immutable`, never with `--delete`.
-2. Upload `releases/<sha>/config.json` for the target environment, then `version.json`, `release.json`, the Vite manifest and `releases/<sha>/index.html`. Every upload is a conditional write. A redeploy of identical bytes is a no-op, and different bytes under the same key fail the job.
-3. Activate by copying `releases/<sha>/index.html` to the root `index.html` with `no-cache`. That one object is the only switch, so no visitor sees new configuration with old HTML.
-4. Invalidate `/` and `/index.html` and wait for completion.
-5. Smoke test: `/` carries the SHA, the entry script returns 200 as JavaScript, the deep link `/details` returns the SPA, the release configuration parses, and `/releases/<sha>/index.html` returns 404.
-6. On a failed step after activation, copy the previous release's `index.html` back, invalidate and repeat the smoke test against it.
+CloudFront rewrites extension-less paths to `/index.html` for deep links and answers 404 for `/releases/<sha>/index.html`, so a retained release is never served as a page. Responses carry HSTS, `X-Frame-Options: DENY` and the CSP of `infra/policies/`. A tab that requests a removed chunk reloads once per release.
 
-CloudFront selects a cache behavior before a function rewrites the path. The default behavior therefore uses the same short-TTL policy as `/index.html`, and its viewer-request function rewrites extension-less paths to `/index.html` for deep links. `/assets/*` has its own long-TTL behavior. The origin access principal gets `s3:ListBucket`, so a missing object returns 404 and never an HTML page with status 200. The function answers 404 for `/releases/<sha>/index.html` as well, so a retained release, including one rolled back for a security bug, is never served as a page. Every response carries the security headers of the distribution: HSTS for one year, `nosniff`, `X-Frame-Options: DENY`, `strict-origin-when-cross-origin` and the Content-Security-Policy of `infra/policies/content-security-policy.txt`, whose `connect-src` names the API origin.
+### 5.5 Rollback
 
-A tab that loads a chunk that no longer exists gets the event `vite:preloadError`. The SPA reloads once per release and per tab, remembered in `sessionStorage`, so a chunk that stays missing cannot cause a reload loop.
-
-### 5.6 `rollback.yml`
-
-A person picks the app, the environment and a SHA from the release manifest. The workflow calls the same reusable deploy workflow with `rollback: true`, so the same environment rules, approvals, lock, OIDC role and checks apply. The deploy script refuses a SHA whose artifact or release files are no longer retained, and the compatibility check runs as for any deploy.
+`rollback.yml` takes the app, the environment and a SHA from the release manifest, and calls the same reusable workflow with `rollback: true`. Approvals, lock, role, compatibility gate and checks all apply. A release whose files are gone is refused.
 
 ## 6. Security model
 
 ### 6.1 OIDC roles
 
-| Role | Trusted subject | Can do |
-|---|---|---|
-| `backend-build`, `frontend-build` | The build job on `main` of the CD workflow of that app | Write `backend/` or `frontend/` in the artifact bucket and `builds/<app>/` in the manifest bucket, conditional writes only, and read both back so that a rerun is a no-op |
-| `backend-staging-deploy`, `backend-production-deploy` | Environment `backend-<env>` and `job_workflow_ref` of `_deploy-backend.yml` on `main` | Read the artifact, create CodeDeploy deployments for its own deployment group, read target health and its two alarms, read the record prefixes the deploy compares, write `<env>/backend/` records |
-| `frontend-staging-deploy`, `frontend-production-deploy` | Environment `frontend-<env>` and `job_workflow_ref` of `_deploy-frontend.yml` on `main` | Write its own frontend bucket, create invalidations on its own distribution, read the record prefixes the deploy compares, write `<env>/frontend/` records |
-
-Two service roles complete the set. `backend-instance` reads `backend/` in the artifact bucket, writes the fleet log group and talks to the CodeDeploy agent and Session Manager endpoints. `backend-codedeploy` manages the launch hook of one Auto Scaling group and registers targets in one target group. Its trust is limited to CodeDeploy calls from its own account.
-
-Each trust policy uses `StringEquals` on `aud` and the full `sub`, never a wildcard. Repos created after 2026-07-15 get the immutable subject format `repo:OWNER@OWNER-ID/REPO@REPO-ID:...`, and the repo's OIDC subject template adds `job_workflow_ref`. The exact expected `sub` per environment is pinned from a claims dump of the demo repo, stored in the environment variable `OIDC_EXPECTED_SUB`, and asserted by `scripts/oidc-claims.sh` before any AWS call.
+There is a build role per app and a deploy role per app and environment. Each trust policy matches `aud` and the full `sub`, with the immutable repository IDs, one environment (`main` for a build role) and the `job_workflow_ref` of one workflow on `main`. Two service roles, `backend-instance` and `backend-codedeploy`, complete the set. [ADR-P4-0006](docs/adr/0006-oidc-roles.md) has the details, and the documents live in `infra/policies/` ([ADR-P4-0012](docs/adr/0012-tested-policy-documents.md)).
 
 ### 6.2 Manifest authority
 
-The manifest bucket has three prefixes and one writer each. The bucket policy requires `If-None-Match` on every `PutObject`, so a record is never overwritten, and it denies deletes. A forged staging record would need the staging deploy role, which only the staging environment's deploy job can assume. Production reads `builds/` for the digest and `staging/` for proof that the same digest passed staging.
+The manifest bucket has the prefixes `builds/`, `staging/` and `production/`, each with one writer. Its policy requires `If-None-Match` on every write and denies deletes. A forged staging record would need the staging deploy role.
 
 ### 6.3 Pinning and permissions
 
-Actions are pinned by commit SHA with the version in a comment. Container images in scripts are pinned by digest. The Node.js tarball is pinned by checksum. npm installs use lockfiles against the public registry, set in each `.npmrc`. Every workflow starts with `permissions: {}`, and each job asks for what it needs. The caller of a reusable deploy workflow grants `id-token: write` and `attestations: read`, and the environment sits on the called job, so a role trusts exactly that job.
+Actions are pinned by SHA, images by digest, Node.js by checksum, npm by lockfile ([ADR-P4-0011](docs/adr/0011-supply-chain.md)). Each workflow starts with `permissions: {}`. The environment sits on the called deploy job, so a role trusts exactly that job.
 
 ### 6.4 GitHub settings
 
 | Setting | Value |
 |---|---|
-| Ruleset on `main` | PR required, required check `ci-gate`, code owner review for `.github/`, `scripts/` and `infra/`, no force push, no deletion, no bypass |
-| Environments `backend-staging`, `frontend-staging` | Deployment branches limited to `main` |
-| Environments `backend-production`, `frontend-production` | Deployment branches limited to `main`, required reviewers, self-review forbidden, admin bypass off |
-| Actions settings | Allow only pinned actions from GitHub and verified creators, workflow permissions read-only by default |
-| OIDC subject template | Adds `job_workflow_ref` to the default claims |
+| Ruleset on `main` | PR, required check `ci-gate`, code owner review for `.github/`, `scripts/`, `infra/`, no force push, no deletion, no bypass |
+| `backend-staging`, `frontend-staging` | Deployment branch `main` only |
+| `backend-production`, `frontend-production` | Branch `main` only, required reviewers, no self-review, no admin bypass |
+| Actions | Only pinned actions from GitHub and verified creators, read-only default token |
+| OIDC subject template | Adds `job_workflow_ref` |
 
-Required reviewers on environments are available on public repositories for every plan, and on private repositories only on paid plans. Artifact attestations on private repositories need GitHub Enterprise Cloud. The demo repo is therefore public.
+Required reviewers on private repositories need a paid plan, and attestations there need Enterprise Cloud. The demo repo is therefore public.
 
 ## 7. Rollback and retention
 
-A rollback is one run of `rollback.yml`, and it works for every release whose files are still in S3. Both deploy scripts refuse a release whose files are gone instead of activating a broken one. Instances keep the last 5 releases on disk, pruned by the `AfterInstall` hook.
-
-Nothing in this submission deletes artifacts, release files or records. The bucket policies deny deletes to every pipeline role, so cleanup belongs to a separate job with its own role, which section 13 leaves out. That job follows these rules:
+Instances keep the last 5 releases on disk. No pipeline role can delete objects. Cleanup belongs to a separate job with its own role, left out (section 13), which would follow these rules:
 
 | Object | Kept |
 |---|---|
-| Backend artifacts | The current and the last 3 production releases whatever their age, and the last 3 staging releases |
-| Frontend assets | 30 days after the last moment their release was active, plus the longest CloudFront TTL. The deactivation time is the next record in the manifest |
-| Frontend releases that are rollback targets | Whatever their age, with their assets |
+| Backend artifacts | Current and last 3 production releases, last 3 staging releases |
+| Frontend assets | 30 days after their release was last active, plus the longest CloudFront TTL |
+| Frontend releases that are rollback targets | Always, with their assets |
 | Release records | Always |
 
 ## 8. Prerequisites
 
-`infra/terraform/` defines these prerequisites in two roots. `roots/delivery` targets a delivery account that holds the artifact and manifest buckets and the build roles, and `roots/environment` targets each account of A4 with `staging.tfvars` or `production.tfvars`. `infra/terraform/README.md` gives the apply order and the prerequisites outside Terraform.
+[`infra/terraform/README.md`](infra/terraform/README.md) defines these in two roots, `roots/delivery` and `roots/environment`, with the apply order and what Terraform does not cover ([ADR-P4-0014](docs/adr/0014-minimal-terraform.md)). Every planned policy equals its document in `infra/policies/`. Nothing has been applied.
 
-`scripts/terraform-check.sh` validated this Terraform and planned the delivery root and both environments offline, with mock credentials and no network. Every policy known at plan time equals its document in `infra/policies/` (section 10.1, ADR-P4-0014). Nothing has been applied.
+| Prerequisite | Root |
+|---|---|
+| VPC with private subnets and endpoints for S3, CodeDeploy, SSM and CloudWatch Logs | environment |
+| Auto Scaling group of 2 or more instances with Node.js, the CodeDeploy agent and a `backend` user | environment |
+| ALB over HTTPS, health check on `/healthz`, only the ALB reaching port 8080 | environment |
+| CodeDeploy application, deployment group, service role and the two alarms | environment |
+| Frontend bucket, CloudFront with OAC, cache behaviors, security headers and rewrite function | environment |
+| Deploy, instance and CodeDeploy roles with their OIDC provider | environment |
+| Artifact and manifest buckets with versioning, checksums and the G4 policy | delivery |
+| Build roles with their OIDC provider | delivery |
+| ACM certificates, DNS zone, state backends, the GitHub settings of section 6.4 | outside Terraform |
 
-| Prerequisite | Root | Where it is defined |
-|---|---|---|
-| Auto Scaling group (minimum 2, across 2 AZs), launch template with the pinned Node.js tarball at `/opt/node`, the CodeDeploy agent and the `backend` service user | `roots/environment` | `infra/terraform/modules/backend` (`fleet.tf`, `user-data.sh.tftpl`) |
-| ALB with an HTTPS listener, target group health check on `/healthz`, 30 s deregistration delay | `roots/environment` | `infra/terraform/modules/backend` (`main.tf`) |
-| Security groups that let only the ALB reach port 8080, private subnets with VPC endpoints for S3, CodeDeploy, SSM and CloudWatch Logs | `roots/environment` | Subnets and endpoints in `infra/terraform/modules/network`, security groups in `infra/terraform/modules/backend`, endpoint policies in `infra/policies/endpoints/` |
-| Instance profile that reads the artifact prefix only | `roots/environment` | `infra/terraform/modules/backend` (`fleet.tf`), with `backend-instance.json` from `infra/policies/trust/` and `infra/policies/permissions/` |
-| CodeDeploy application, deployment groups, service role, the alarms of G5 | `roots/environment` | `infra/terraform/modules/backend` (`deploy.tf`), with `backend-codedeploy.json` from `infra/policies/trust/` and `infra/policies/permissions/` |
-| Artifact and manifest buckets with versioning, SHA-256 checksums, the G4 bucket policy and retention tags | `roots/delivery` | `infra/terraform/modules/delivery`, bucket policies in `infra/policies/buckets/`. Each upload through `put_immutable` in `scripts/lib.sh` sets the SHA-256 checksum |
-| Frontend buckets, CloudFront distributions with OAC, cache behaviors, security headers and the viewer-request function | `roots/environment` | `infra/terraform/modules/frontend` (`main.tf`, `cdn.tf`, `rewrite.js`), bucket policies in `infra/policies/buckets/` |
-| OIDC provider and the six roles | `roots/delivery` for the build roles, `roots/environment` for the deploy roles, each with its own provider | `infra/terraform/modules/github-oidc`, with the documents in `infra/policies/trust/` and `infra/policies/permissions/` |
-| GitHub ruleset, environments, reviewers, variables and the OIDC subject template | None, these are GitHub settings | Section 6.4. The `github_repository_variables` and `github_environment_variables` outputs give the AWS values of section 9 |
-
-Alarms for G5: `HTTPCode_Target_5XX_Count` above 1 % of `RequestCount` in 2 of 3 one-minute periods, and `UnHealthyHostCount` above 0 for 3 consecutive minutes. They notify through `alarm_actions`, and `deploy-backend.sh` reads them after each deploy that replaces a recorded release (section 5.4). They are not attached to the deployment group, because CodeDeploy would then stop the first deploy while instances without a release keep `UnHealthyHostCount` raised, and stop every return to a previous release while the failed one keeps an alarm raised.
+The alarms are `HTTPCode_Target_5XX_Count` above 1 % of requests in 2 of 3 minutes, and `UnHealthyHostCount` above 0 for 3 minutes. The deploy script reads them instead of the deployment group, for the reasons in ADR-P4-0003.
 
 ## 9. Configuration
 
 | Name | Kind | Used by |
 |---|---|---|
-| `DEPLOY_ENABLED` | Variable, repo or environment | Every AWS step. Anything but `true` keeps the run in dry-run mode |
-| `AWS_REGION` | Variable | `configure-aws-credentials` |
-| `BACKEND_BUILD_ROLE_ARN`, `FRONTEND_BUILD_ROLE_ARN` | Variable | Build jobs |
-| `DEPLOY_ROLE_ARN` | Environment variable | Deploy jobs |
-| `OIDC_EXPECTED_SUB` | Environment variable | `scripts/oidc-claims.sh` in deploy jobs. Required once `DEPLOY_ENABLED` is `true` |
-| `BACKEND_BUILD_OIDC_SUB`, `FRONTEND_BUILD_OIDC_SUB` | Variable | `scripts/oidc-claims.sh` in build jobs. Required once `DEPLOY_ENABLED` is `true` |
-| `ARTIFACT_BUCKET`, `MANIFEST_BUCKET` | Variable | Build and deploy jobs |
+| `DEPLOY_ENABLED` | Variable | Every AWS step. Anything but `true` means dry run |
+| `AWS_REGION`, `ARTIFACT_BUCKET`, `MANIFEST_BUCKET` | Variable | Build and deploy jobs |
+| `BACKEND_BUILD_ROLE_ARN`, `FRONTEND_BUILD_ROLE_ARN`, `BACKEND_BUILD_OIDC_SUB`, `FRONTEND_BUILD_OIDC_SUB` | Variable | Build jobs |
+| `DEPLOY_ROLE_ARN`, `OIDC_EXPECTED_SUB` | Environment variable | Deploy jobs |
 | `CODEDEPLOY_APPLICATION`, `CODEDEPLOY_GROUP`, `TARGET_GROUP_ARN`, `BASE_URL` | Environment variable | Backend deploy |
 | `FRONTEND_BUCKET`, `DISTRIBUTION_ID`, `BASE_URL`, `BACKEND_URL` | Environment variable | Frontend deploy |
 | `NOTIFY_WEBHOOK_URL` | Secret | Failure notification, off when unset |
 
+Terraform outputs give the AWS values. The OIDC subject variables become required once `DEPLOY_ENABLED` is `true`.
+
 ## 10. Verification
 
-Each check below is one of four kinds: a static check, an offline test, the GitHub-only demonstration, or the AWS acceptance plan. Only the first two have run for this submission. Their output is in `evidence/`, and `evidence/README.md` names the commit and command behind each file.
+Static checks and offline tests have run, and [`evidence/README.md`](evidence/README.md) names the command behind each output. The GitHub demonstration and the AWS acceptance plan have not run ([ADR-P4-0008](docs/adr/0008-verification-without-aws.md)).
 
-### 10.1 Static checks
+| Check | What it proves |
+|---|---|
+| `scripts/lint-workflows.sh` | actionlint, zizmor at medium and above, shellcheck: no finding |
+| `infra/policies/test_policies.py` | No shared subject, no wildcard trust, no deletes or unconditional writes, no role writing outside its prefix |
+| `scripts/terraform-check.sh` | Offline plans of both roots, every planned policy equals its document, all 125 ARNs in 30 documents name planned resources |
+| `scripts/scan.sh` | gitleaks over the history and trivy at HIGH and CRITICAL find nothing |
+| Unit tests of both apps | Routes, `/version`, config parsing, the reload guard, the API contract |
+| Nine suites in `scripts/tests/` | Each deploy path against the fake AWS CLI, including failed last instance, alarm during deploy, vetoed rollback, wrong checksum and forward-only refusal. The hooks run in `amazonlinux:2023` |
+| Playwright tests | Two real releases in a fake bucket behind a CloudFront-like server: deep links, an open tab through activation and rollback, a missing chunk reloading once |
+| Build determinism | Two builds of one commit give identical digests for both apps |
 
-| Check | Command | Result |
-|---|---|---|
-| Workflow lint | `bash scripts/lint-workflows.sh` (actionlint 1.7.12, zizmor 1.31.1 at medium and above, shellcheck) | No finding. Six help-level `self-repository` suggestions from zizmor remain below the threshold. Both linters flag a deliberately broken workflow |
-| Policy tests | `python3 -I infra/policies/test_policies.py` | 31 of 31 pass |
-| Terraform check | `bash scripts/terraform-check.sh` (Terraform 1.16.6, tflint 0.61.0, trivy 0.76.1, offline plans of the delivery root and both environments) | 18 of 18 steps pass. 26 planned policies equal their documents, 4 wait for the distribution ID, and all 125 ARNs in the 30 documents name planned resources |
-| Secret and dependency scan | `bash scripts/scan.sh` (gitleaks 8.30.1 over the history, trivy 0.76.1 fs at HIGH and CRITICAL, dev dependencies included) | No leak in 406.77 KB of history. No HIGH or CRITICAL vulnerability in the three lockfiles |
+The GitHub demonstration publishes this folder as its own repo (section 12). It shows a green `ci-gate`, both CD workflows in dry run, production awaiting approval, and the claims check failing on a wrong `aud` or `sub`.
 
-The policy tests fail when two roles share a subject, when a trust condition uses a wildcard or misses `aud`, when a deploy role can write the artifact prefix or reads more record prefixes than its scripts compare, when a role writes outside its manifest prefix, when the CodeDeploy service role can create, delete or terminate capacity, when an endpoint policy reaches more than the release, package and agent buckets, when the Content-Security-Policy allows more than its own origin and the API, or when a bucket policy allows deletes, unconditional writes or plain HTTP.
+With AWS, the acceptance plan runs in staging only:
 
-The Terraform check fails when a planned policy differs from its document, when an ARN in a document names a resource that no plan creates, or when the rendered user data has a shellcheck finding. It also fails on a tflint finding and on a HIGH or CRITICAL trivy finding that `infra/terraform/README.md` does not list as accepted. Its plans run with mock credentials in containers without network, so a passing plan made no AWS call.
-
-### 10.2 Offline tests
-
-| Suite | What it proves | Result |
-|---|---|---|
-| `backend` unit tests | Routes, validation, CORS, `/version` | 9 of 9 pass |
-| `frontend` unit tests | Configuration parsing, release detection, the chunk-reload guard, the contract against `backend/openapi.yaml` | 14 of 14 pass |
-| `test-deploy-frontend.sh` | Upload order, activation last, no `--delete`, conditional writes, wrong checksum, incompatible backend, failed smoke test and invalidation, rollback, staging record, dry run | 31 of 31 pass |
-| `test-deploy-backend.sh` | Fleet checks, a failed last instance, a failed smoke test, an alarm raised during the deploy, a vetoed rollback, a release below the frontend's needs, retention, staging record, dry run | 36 of 36 pass |
-| `test-check-forward.sh` | Forward-only promotion, rollback exception, diverged history | 9 of 9 pass |
-| `test-verify-provenance.sh` | Attestation from an unapproved workflow, another branch or a self-hosted runner | 6 of 6 pass |
-| `test-oidc-claims.sh` | Wrong `aud`, wrong `sub`, token never printed | 8 of 8 pass |
-| `test-ci-gate.sh`, `test-summary.sh` | Gate results, summary and notification | 5 and 5 pass |
-| `test-hooks.sh` | Every CodeDeploy hook in `amazonlinux:2023` with a stub `systemctl`: first deployment, redeployment, failed validation, a runtime older than the release, release pruning | 16 of 16 pass |
-| Browser tests | Two real builds deployed by `deploy-frontend.sh` into a fake bucket, served by a local server that rewrites like CloudFront and sends the production Content-Security-Policy: the app renders with its own configuration, a deep link renders, an open tab follows an activation and a rollback without errors, a retained release page returns 404, a missing chunk reloads once, and a chunk that stays missing does not loop | 6 of 6 pass |
-| `test-publish-artifact.sh` | The build record names the S3 object version, a rerun with the same bytes is a no-op, other bytes fail, dry run | 7 of 7 pass |
-| Build determinism | Two runs of `build-backend.sh` and of `build-frontend.sh` for the same commit | Identical digests for both apps |
-
-### 10.3 GitHub-only demonstration
-
-This part needs the folder published as its own repository (section 12) and no AWS account. It shows a PR with a green `ci-gate`, a push to `main` that runs both CD workflows with the deploy steps in dry-run mode, the production jobs waiting for approval, and the OIDC claims step printing the sanitized claims and failing on an unexpected `aud` or `sub`.
-
-### 10.4 AWS acceptance plan
-
-With the prerequisites in place and `DEPLOY_ENABLED=true` on the staging environments only:
-
-1. Deploy a backend release and check that every instance serves its SHA, that the ALB kept at least one healthy target during the deploy and reported 2 healthy targets after it, and that `backend-codedeploy` needed no permission beyond its document.
-2. Deploy a release whose `ValidateService` fails on the last instance and check the automatic redeploy of the previous release.
-3. Deploy two frontend releases while a browser tab stays open on the first, and run the browser test against the staging distribution.
-4. Assume each role from the wrong environment, the wrong workflow, the wrong audience and a branch other than `main`, and check that STS denies every attempt.
-5. Try to overwrite and delete a manifest record with each role and check that S3 denies it.
-6. Run `rollback.yml` for both apps and check the recorded state.
+1. Deploy the backend and check every instance's SHA, ALB health, and that `backend-codedeploy` needed nothing beyond its document.
+2. Fail `ValidateService` on the last instance and watch the automatic return.
+3. Deploy two frontend releases with a tab open and run the browser test against the distribution.
+4. Assume each role from the wrong environment, workflow, audience and branch, and expect STS to deny.
+5. Try to overwrite and delete a manifest record with each role, and expect S3 to deny.
+6. Run `rollback.yml` for both apps.
 
 ## 11. Traceability
 
 | Decision | Requirements | Principles | Verified by | ADR |
 |---|---|---|---|---|
-| G1 ruleset, PR checks, contract test, one required gate | REQ-P4-3, REQ-P4-4 | OPS-DP3, SEC-DP4, REL-DP5 | `test-ci-gate.sh`, contract test, GitHub demo | ADR-P4-0001 |
-| G2 build once, dry-run path without AWS | REQ-P4-1, REQ-P4-2, REQ-P4-4, REQ-P4-5 | OPS-DP4, REL-DP5, FSI-DP2 | Dry-run and wrong-checksum tests, build determinism | ADR-P4-0005, ADR-P4-0008, ADR-P4-0013 |
+| G1 ruleset, PR checks, contract test, one gate | REQ-P4-3, REQ-P4-4 | OPS-DP3, SEC-DP4, REL-DP5 | `test-ci-gate.sh`, contract test, GitHub demo | ADR-P4-0001 |
+| G2 build once, dry run without AWS | REQ-P4-1, REQ-P4-2, REQ-P4-4, REQ-P4-5 | OPS-DP4, REL-DP5, FSI-DP2 | Dry-run and checksum tests, build determinism | ADR-P4-0005, ADR-P4-0008, ADR-P4-0013 |
 | G3 provenance, SBOM, version endpoints | REQ-P4-4 | SEC-DP2, OPS-DP2 | `test-verify-provenance.sh` | ADR-P4-0011 |
-| G4 manifest authority and gated promotion | REQ-P4-4 | OPS-DP3, SEC-DP1, SEC-DP2, FSI-DP4 | Policy tests, plan policy check, staging record tests | ADR-P4-0005, ADR-P4-0012 |
-| G5 fleet checks, alarms, automatic rollback | REQ-P4-1, REQ-P4-2, REQ-P4-4 | OPS-DP4, OPS-DP6, REL-DP1 | Deploy failure-path and alarm tests, hook tests | ADR-P4-0003 |
+| G4 manifest authority, gated promotion | REQ-P4-4 | OPS-DP3, SEC-DP1, SEC-DP2, FSI-DP4 | Policy tests, plan policy check, staging record tests | ADR-P4-0005, ADR-P4-0012 |
+| G5 fleet checks, alarms, automatic rollback | REQ-P4-1, REQ-P4-2, REQ-P4-4 | OPS-DP4, OPS-DP6, REL-DP1 | Deploy failure tests, hook tests | ADR-P4-0003 |
 | G6 one-action rollback with retention | REQ-P4-4 | OPS-DP4, REL-DP2 | Rollback tests | ADR-P4-0003, ADR-P4-0004 |
-| G7 one OIDC role per app and environment | REQ-P4-4, REQ-P4-5 | SEC-DP1, SEC-DP6 | Policy tests, plan policy check, `test-oidc-claims.sh`, GitHub demo, AWS plan step 4 | ADR-P4-0006 |
+| G7 one OIDC role per app and environment | REQ-P4-4, REQ-P4-5 | SEC-DP1, SEC-DP6 | Policy tests, `test-oidc-claims.sh`, GitHub demo, AWS plan step 4 | ADR-P4-0006 |
 | G8 pipeline hardening | REQ-P4-3, REQ-P4-4 | SEC-DP3, SEC-DP4 | actionlint, zizmor | ADR-P4-0011 |
-| G9 ordering, environment lock, compatibility | REQ-P4-1, REQ-P4-2, REQ-P4-4 | OPS-DP4, REL-DP5 | `test-check-forward.sh`, compatibility tests | ADR-P4-0007 |
+| G9 ordering, lock, compatibility | REQ-P4-1, REQ-P4-2, REQ-P4-4 | OPS-DP4, REL-DP5 | `test-check-forward.sh`, compatibility tests | ADR-P4-0007 |
 | G10 dependency control | REQ-P4-4 | SEC-DP4 | Audit, dependency review, scan | ADR-P4-0011 |
 | G11 visible failures | REQ-P4-4 | OPS-DP2, OPS-DP7 | `test-summary.sh` | ADR-P4-0001 |
-| Release-scoped frontend with one-object activation | REQ-P4-2 | OPS-DP4, REL-DP2 | Deploy tests, browser tests | ADR-P4-0004 |
-| Workflows under this folder, live runs from a split | REQ-P4-3, REQ-P4-6 | OPS-DP3 | Review | ADR-P4-0002 |
+| Release-scoped frontend, one-object activation | REQ-P4-2 | OPS-DP4, REL-DP2 | Deploy and browser tests | ADR-P4-0004 |
+| Workflows here, live runs from a split | REQ-P4-3, REQ-P4-6 | OPS-DP3 | Review | ADR-P4-0002 |
 | Backend and frontend stacks | REQ-P4-1, REQ-P4-2, REQ-P4-4 | SEC-DP3, OPS-DP4 | Unit tests | ADR-P4-0009, ADR-P4-0010 |
-| Minimal Terraform for the prerequisites, planned offline and never applied | REQ-P4-1, REQ-P4-2, REQ-P4-5 | OPS-DP3, REL-DP5, SEC-DP3, SEC-DP4 | `terraform-check.sh`, AWS acceptance plan | ADR-P4-0014 |
+| Minimal Terraform, planned offline | REQ-P4-1, REQ-P4-2, REQ-P4-5 | OPS-DP3, REL-DP5, SEC-DP3, SEC-DP4 | `terraform-check.sh`, AWS acceptance plan | ADR-P4-0014 |
 
 ## 12. Live runs from this monorepo
 
-GitHub runs workflows only from `.github/workflows` at a repository root, and the template keeps this problem under `src/problem4`. All paths in the workflows are relative to this folder, so the folder can be published as its own repository with its history:
+GitHub runs workflows only from `.github/workflows` at a repository root. Every path in the workflows is relative to this folder, so it can be published as its own repo ([ADR-P4-0002](docs/adr/0002-subtree-split.md)):
 
 ```bash
 git subtree split --prefix src/problem4 -b problem4-split
 ```
 
-The split creates new commit SHAs. The release manifest and the build records hold the split SHA, because that is the commit the pipeline builds. A table of source SHA and split SHA belongs next to each demonstration run.
+Records hold the split SHA, so a table of source SHA and split SHA belongs next to each demonstration run.
 
 ## 13. Left out deliberately
 
 | Item | Why |
 |---|---|
-| Blue/green or canary traffic shifting for the backend | Doubles instances during each deploy. It is the upgrade path once rollback speed matters more than cost (ADR-P4-0003) |
-| Canary releases of the frontend through CloudFront continuous deployment | One-object activation already gives instant rollback, and a staging distribution doubles the CDN setup |
-| An infrastructure pipeline with Terraform plan and apply | `infra/terraform/` is planned offline by `scripts/terraform-check.sh` and never applied. Applying it needs the accounts of A4 (ADR-P4-0014) |
-| Running older frontend releases' client tests against a new backend | The release manifest that lists live releases needs AWS. The version gate in G9 covers the contract number offline |
-| DAST, load tests and performance budgets in the pipeline | Outside the stated scope |
-| The cleanup job and its role (section 7) | Needs an account to test against, and the deploy roles must never delete |
-| Database migrations | A5 |
-| Self-hosted runners and multi-region deploys | A6 and A2 |
+| Blue/green or canary for the backend | Doubles instances per deploy. Worth it once rollback speed matters more than cost |
+| CloudFront continuous deployment for the frontend | One-object activation already rolls back instantly |
+| A Terraform plan and apply pipeline | Applying needs the accounts of A4 |
+| Old frontend releases' tests against a new backend | Listing live releases needs AWS. The version gate covers it offline |
+| DAST, load tests, performance budgets | Outside the stated scope |
+| The cleanup job of section 7 | Needs an account to test against, and deploy roles must never delete |
+| Database migrations, self-hosted runners, multi-region | A5, A6 and A2 |

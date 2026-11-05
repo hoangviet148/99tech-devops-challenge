@@ -281,6 +281,7 @@ record() {
   if [ "$3" = "FAIL" ]; then
     compose ps -a >&2 || true
     compose logs --no-color --tail 40 nginx api >&2 || true
+    compose exec -T nginx nslookup -type=a api 127.0.0.11 >&2 || true
   fi
 }
 

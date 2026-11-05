@@ -54,7 +54,7 @@ bash scripts/tests/browser/run.sh
 
 The Problem 3 scripts with `--yes` all bind 127.0.0.1:18080, so run one at a time.
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the trace check, the linters, the Problem 2 tests and lab, six Problem 3 scenarios and the Problem 4 offline suites, and fails on a fork.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the trace check, the linters, the Problem 2 tests and lab, five Problem 3 scenarios and the Problem 4 offline suites, and fails on a fork. S6 runs only locally: on two of three runs on a GitHub-hosted runner, nginx kept the old API addresses for more than 15 s after every replica was recreated.
 
 ## Limits
 

@@ -148,9 +148,9 @@ jobs:
         run: docker compose run --rm --no-deps nginx nginx -t
       - name: Alert rule tests
         run: bash scripts/test-alerts.sh
-      - name: Fault scenarios S1, S5, S6, S8, S11 and S12
+      - name: Fault scenarios S1, S5, S8, S11 and S12
         env:
-          SCENARIOS: S1,S5,S6,S8,S11,S12
+          SCENARIOS: S1,S5,S8,S11,S12
         run: |
           report="$RUNNER_TEMP/p3-verify.md"
           bash scripts/verify.sh --yes --only "$SCENARIOS" --out "$report"

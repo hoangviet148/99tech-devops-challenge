@@ -1,0 +1,4 @@
+services:
+  api:
+    volumes:
+      - ${P3_PROBE_DIR:?}/api-pool-listener/index.js:/app/src/index.js:ro

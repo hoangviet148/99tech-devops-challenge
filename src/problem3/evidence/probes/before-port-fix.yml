@@ -1,0 +1,4 @@
+services:
+  nginx:
+    volumes: !override
+      - ${P3_PROBE_DIR:?}/nginx-port-fix:/etc/nginx/conf.d:ro

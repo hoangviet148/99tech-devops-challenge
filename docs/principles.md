@@ -4,13 +4,13 @@ The IDs are local to this submission. Each name quotes a design principle of the
 
 | Problem | Sets cited by its decision records or its traceability table | Focus |
 |---|---|---|
-| 1 | All sets | Every pillar gets a row in the Well-Architected review of `src/problem1/SOLUTION.md` |
+| 1 | All sets | The decision records of Problem 1 apply every set, and its trade-off register names the principles a decision works against |
 | 2 | OPS, REL, SEC, COST and GEN | The runbook and prevention |
 | 3 | REL, OPS, SEC and GEN | The stack and its operation |
 | 4 | OPS, SEC, REL, FSI and GEN | The delivery pipeline |
 | 5 | SEC, FSI, OPS, REL, PERF, COST and GEN | SEC and FSI lead, and REL, PERF and COST check that the changes keep REQ-P5-6 |
 
-Problem 1's Well-Architected review names the principles its decisions trade off or leave to Problem 5. The other problems cite a principle only where a decision applies it or works against it, in the Principles field or the text of a decision record or in a row of the traceability table. `tools/trace_check.py` fails when this table and those citations disagree.
+Problem 1 cites principles in the Principles field and the text of each decision record, and its `SOLUTION.md` names the ones a decision works against in the trade-off register of section 12. The other problems cite a principle only where a decision applies it or works against it, in the Principles field or the text of a decision record or in a row of the traceability table. `tools/trace_check.py` fails when this table and those citations disagree.
 
 | ID | Principle | Set |
 |---|---|---|

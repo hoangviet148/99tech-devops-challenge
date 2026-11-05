@@ -1,6 +1,6 @@
 # Problem 1 architecture decision records
 
-Each record follows the format in `template.md`: context, decision, alternatives with their trade-offs, consequences, verification and the trigger that would reopen it. Requirement IDs refer to section 1 of [`SOLUTION.md`](../../SOLUTION.md), principle IDs to its Appendix A, and decision IDs such as AD-P1-01 to its traceability section.
+Each record follows the format in `template.md`: context, decision, alternatives with their trade-offs, consequences, verification and the trigger that would reopen it. Requirement IDs refer to [`docs/requirements.md`](../../../../docs/requirements.md), principle IDs to [`docs/principles.md`](../../../../docs/principles.md), and decision IDs such as AD-P1-01 to the traceability section of [`SOLUTION.md`](../../SOLUTION.md).
 
 | ADR | Decision | Status | Date |
 |---|---|---|---|

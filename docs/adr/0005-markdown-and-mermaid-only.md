@@ -15,7 +15,7 @@ The reviewer must be able to read every solution without pain, which the instruc
 
 ## Decision
 
-Every document is Markdown, and every diagram is a Mermaid block inside it. Evidence files are plain text or Markdown written by the scripts that produce them.
+Every document is Markdown, and every diagram is a Mermaid block inside it. Every file under `evidence/`, the run outputs and the scripts and probe inputs kept beside them, is plain text that a diff shows.
 
 ## Alternatives considered
 

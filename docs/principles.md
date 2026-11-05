@@ -2,15 +2,15 @@
 
 The IDs are local to this submission. Each name quotes a design principle of the AWS Well-Architected Framework or of its Financial Services Industry Lens, as published on docs.aws.amazon.com and read on 2026-11-04. An AWS best practice ID such as `SEC02-BP02` appears only where a `SOLUTION.md` cites one specific best practice.
 
-| Problem | Principle sets applied |
-|---|---|
-| 1 | All sets. Every pillar gets a row in the Well-Architected review of `src/problem1/SOLUTION.md` |
-| 2 | OPS, REL and SEC for the runbook and prevention |
-| 3 | REL, OPS and SEC for the stack and its operation |
-| 4 | OPS, SEC and REL for the delivery pipeline |
-| 5 | SEC and FSI as the main sets. REL, PERF and COST check that the changes keep REQ-P5-6 |
+| Problem | Sets cited by its decision records or its traceability table | Focus |
+|---|---|---|
+| 1 | All sets | Every pillar gets a row in the Well-Architected review of `src/problem1/SOLUTION.md` |
+| 2 | OPS, REL, SEC, COST and GEN | The runbook and prevention |
+| 3 | REL, OPS, SEC and GEN | The stack and its operation |
+| 4 | OPS, SEC, REL, FSI and GEN | The delivery pipeline |
+| 5 | SEC, FSI, OPS, REL, PERF, COST and GEN | SEC and FSI lead, and REL, PERF and COST check that the changes keep REQ-P5-6 |
 
-A principle that no decision serves is listed as unapplied in the problem's Well-Architected review with the reason, instead of being claimed.
+Problem 1's Well-Architected review names the principles its decisions trade off or leave to Problem 5. The other problems cite a principle only where a decision applies it or works against it, in the Principles field or the text of a decision record or in a row of the traceability table. `tools/trace_check.py` fails when this table and those citations disagree.
 
 | ID | Principle | Set |
 |---|---|---|

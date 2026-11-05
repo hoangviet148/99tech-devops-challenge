@@ -34,7 +34,7 @@ Problem 4 cannot run its workflows from this repository. Live runs use `git subt
 ### Positive
 
 - One link opens all five answers, the registers and the decision records.
-- `upstream/main` stays untouched, so the template can be restored at any time (OPS-DP4).
+- The template's last commit `d514e60` stays in the history, so the template can be restored and the Problem 3 before runs can check it out from any full clone (OPS-DP4).
 
 ### Negative
 
@@ -42,11 +42,13 @@ Problem 4 cannot run its workflows from this repository. Live runs use `git subt
 
 ### Risks
 
-- A tool could create the remote as a fork by mistake. `gh repo view --json isFork` is checked before the link is shared.
+- A tool could create the remote as a fork by mistake. The root workflow fails on a fork, and the check under Verification runs before the link is shared.
 
 ## Verification
 
-`gh repo view --json isFork` returns `false` for the published repository (local run, before the link is shared). The root README index links every `SOLUTION.md` (review).
+`url="$(git remote get-url origin)" && gh repo view "$url" --json isFork --jq .isFork` prints `false` for the published repository (local run, before the link is shared). The root workflow fails when the event payload marks the repository as a fork (CI). The root README index links every `SOLUTION.md` (review).
+
+GitHub's webhook reference, https://docs.github.com/en/webhooks/webhook-events-and-payloads, marks `repository` as required in the `push`, `pull_request` and `workflow_dispatch` payloads. GitHub's OpenAPI description of the same payloads, `descriptions/api.github.com/api.github.com.json` in https://github.com/github/rest-api-description, requires the boolean `fork` in that object. Both were read on 2026-11-05.
 
 ## Reopen when
 

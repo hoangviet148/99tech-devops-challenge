@@ -1,6 +1,6 @@
 # Requirements
 
-Every requirement of the challenge has an ID here, and every decision record cites the IDs it serves. IDs ending in `A` are derived by this submission from an assumption, and the problem's `SOLUTION.md` states the basis. `tools/trace_check.py` fails when a requirement has no decision record or no traceability row.
+Every requirement of the challenge has an ID here, and every decision record cites the IDs it serves. IDs ending in `A` are derived by this submission from an assumption, and the problem's `SOLUTION.md` states the basis. `tools/trace_check.py` fails when a requirement has no decision record, has no row in the traceability table of its problem's `SOLUTION.md` (of the root README for the REQ-G IDs), or is restated in a `SOLUTION.md` table headed `ID | Requirement` in words that differ from this register.
 
 | ID | Requirement | Source | Answered in |
 |---|---|---|---|
@@ -19,11 +19,11 @@ Every requirement of the challenge has an ID here, and every decision record cit
 | REQ-P1-9 | Overview diagram of the services and the role each plays | Deliverable | `src/problem1` |
 | REQ-P1-10 | Why each cloud service is used and which alternatives were considered | Deliverable | `src/problem1` |
 | REQ-P1-11 | Plans for scaling once the product outgrows the current setup | Deliverable | `src/problem1` |
-| REQ-P1-12A | 99.95 % availability objective for the trading API | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
-| REQ-P1-13A | AZ loss: no acknowledged data lost, trading back within 1 min. Region loss: objectives set after the first DR exercise, trading halted until a person decides | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
+| REQ-P1-12A | 99.95 % availability objective for the trading API in one region over 3 AZs. An integrity halt of the affected shards counts against it | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
+| REQ-P1-13A | AZ loss: no acknowledged data lost, trading back within 1 min. Region loss: RPO 1 min of acknowledged orders and trades, trading back within 1 h of the start of the outage, promotion decided by a person | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
 | REQ-P1-14A | Spendable balances never go negative, no trade settles twice, matching is deterministic per symbol | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
 | REQ-P1-15A | REQ-P1-8 applies per request class, measured from a load generator inside the region through the public hostname, with CloudFront and WAF in the path. It holds at a fixed 500 rps and at a 3x plateau (1500 rps) reached by a 5 min ramp, once autoscaling has converged. During convergence up to 1 % of requests may be shed with 429, for at most 5 min | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
-| REQ-P1-16A | Order-to-match p99 under 20 ms from durable acceptance to the committed match, and trade-to-settlement p99 under 1 s from the committed match to the ledger commit | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
+| REQ-P1-16A | Order-to-match p99 under 50 ms from durable acceptance to the committed match, and trade-to-settlement p99 under 1 s from the committed match to the ledger commit | Assumption, `src/problem1/SOLUTION.md` | `src/problem1` |
 | REQ-P2-1 | Steps to troubleshoot the production issues on the VM | Task | `src/problem2` |
 | REQ-P2-2 | The causes and scenarios expected | Challenge | `src/problem2` |
 | REQ-P2-3 | The impact of each possible root cause | Challenge | `src/problem2` |
